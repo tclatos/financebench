@@ -1,0 +1,14 @@
+# Document Graph configuration for financebench.
+#
+# Backs the `financebench_build` workflow (config/workflows.yaml) and the
+# `cli docgraph` commands. The docgraph agent resolves its database via
+# `graph_db.default` (see config/app_conf.yaml).
+#
+# OCR Markdown is written to the OneDrive mirror (see financebench/bench/_env.py)
+# and copied into data/markdown/ before the graph is built, so Document node
+# paths stay project-relative while the OneDrive copy is the persistent backup.
+knowledge_tree:
+  db_path: ${paths.data_root}/kg/financebench_tree.db
+  # Built-in markdownize profile: fast | medium | best (default = medium).
+  # For FinanceBench (all PDFs) medium == best: pdf_converter is mistral either way.
+  markdownize_profile: medium

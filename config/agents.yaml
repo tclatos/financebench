@@ -1,0 +1,84 @@
+# Unified Agent Profiles — all harnesses under one ``agents:`` dict.
+#
+# Each profile carries a ``harness:`` discriminator (``langchain`` | ``deerflow``).
+# The optional ``agent_defaults:`` block holds inheritable defaults applied to
+# ``harness: langchain`` profiles (DeerFlow profiles are fully self-describing).
+# See docs/agents.md and docs/harness.md.
+
+agent_defaults:
+  type: react
+  llm: null  # null = use the global default LLM from config
+  middlewares:
+    - class: genai_tk.agents.langchain.middleware.rich_middleware.RichToolCallMiddleware
+  checkpointer:
+    type: none
+  backend:
+    type: none
+  enable_planning: true
+  enable_file_system: true
+  skills:
+    directories:
+      - ${paths.project}/skills/custom
+      - ${paths.project}/skills/community
+  default_profile: default
+
+agents:
+  default:
+    harness: langchain
+    name: "Default Agent"
+    type: react
+    llm: default
+    system_prompt: >
+      You are a helpful AI assistant for financebench.
+      Use available tools when they help answer the question.
+    tools:
+      - factory: financebench.tools.example_tool.create_example_tools
+    mcp_servers: []
+
+  research:
+    harness: langchain
+    name: "Research Agent"
+    type: deep
+    llm: default
+    enable_planning: true
+    system_prompt: >
+      You are a research assistant. Plan your approach, use available tools,
+      and produce well-structured, cited responses.
+    skill_directories:
+      - ${paths.project}/skills/custom
+      - ${paths.project}/skills/community
+
+  # Deep agent that answers FinanceBench questions by navigating the Document
+  # Graph. `cli agent answer` (financebench/commands/agent_commands.py) loads
+  # this profile and runs it through `genai_graph.agent.create_docgraph_agent`,
+  # which injects the Document Graph navigation tools and the colocated
+  # genai_graph/agent/skills plus this project's skills/custom.
+  docgraph:
+    harness: langchain
+    name: "FinanceBench QA Analyst"
+    type: deep
+    llm: deepseek_v4flash@openrouter
+    description: "Deep agent that answers FinanceBench financial questions by navigating the Document Graph."
+    system_prompt: |
+      You are an expert financial analyst answering questions about a company's
+      SEC filing (10-K / 10-Q). You do NOT have the document memorised — you must
+      read it by NAVIGATING the Document Graph loaded into your tools.
+
+      Read the `financebench-qa` skill for the navigation strategy and the
+      financial-statement targeting rules, then navigate the graph —
+      `get_folder_toc`, `get_document_toc`, `get_section_content`,
+      `search_sections` — reading the relevant sections until your answer is
+      grounded in the source text.
+
+      Answer the question directly and concisely. Ground every claim in section
+      text you actually read; cite the source section as `[hash::sequence]` and
+      name the document filename. Give numeric answers in the units the question
+      asks for, with the rounding it asks for. If the information is genuinely
+      absent from the graph, say so explicitly — never invent or infer from
+      general knowledge.
+    tools: []
+    skill_directories:
+      - ${paths.project}/skills/custom
+    enable_planning: true
+    enable_file_system: false
+    recursion_limit: 160
