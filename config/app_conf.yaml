@@ -198,13 +198,13 @@ cli:
     - genai_tk.workflow.prefect_commands.PrefectCommands
     - genai_tk.extra.commands_extra.ExtraCommands
     - genai_tk.agents.commands_agents.AgentCommands
-    - genai_tk.agents.sandbox.cli_commands.SandboxCommands
-    - genai_tk.extra.structured.commands_baml.BamlCommands
-    - genai_tk.workflow.rag.commands_rag.RagCommands
-    - genai_tk.mcp.cli_commands.McpCommands
+  #  - genai_tk.agents.sandbox.cli_commands.SandboxCommands
+  #  - genai_tk.extra.structured.commands_baml.BamlCommands
+  #  - genai_tk.workflow.rag.commands_rag.RagCommands
+  #  - genai_tk.mcp.cli_commands.McpCommands
     - genai_tk.cli.commands_skills.SkillsCommands
     - genai_tk.main.cli.register_commands
     - financebench.commands.agent_commands.AgentCommands
     - genai_tk.cli.commands_monitoring.MonitoringCommands
     - genai_tk.cli.commands_trajectory.TrajectoryCommands
-    - browser_control.commands.example_commands.ExampleCommands
+    - genai_graph.core.commands_docgraph.DocGraphCommands

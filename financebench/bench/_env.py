@@ -28,6 +28,9 @@ ONEDRIVE_MARKDOWN_DIR = ONEDRIVE / "prj" / "financebench" / "markdown"
 
 DEFAULT_AGENT_LLM = "deepseek_v4flash@openrouter"
 DEFAULT_JUDGE_LLM = "deepseek_v4flash@openrouter"
+# Flash LLM used by the LLM-enhanced Document Graph build (--llm) to discover
+# each document's outline (TOC + descriptions + section summaries) in one call.
+DEFAULT_BUILD_LLM = "deepseek_v4flash@openrouter"
 
 
 def load_env() -> None:
