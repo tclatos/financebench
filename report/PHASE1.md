@@ -518,3 +518,203 @@ uv run python -m financebench.bench.grade
 Agent profile: `config/agents.yaml` `docgraph` (`excluded_tools`, inlined
 strategy, temp 0). Outline cache: `data/kg/financebench_tree_outlines/
 deepseek_v4flash_openrouter__34975673e354/` (gitignored).
+
+---
+
+# FinanceBench Phase 1.3 — Restore heading hierarchy + richer descriptions + rerun/report
+
+**Date:** 2026-08-25
+**Trigger:** Phase 1.2's hybrid outline produced 251 sections but the heading *levels*
+were still degenerate (`{1:176, 2:15, 3:59}` — almost everything forced to level 1)
+because `tree_parser._infer_levels` overrode the Markdown levels whenever ≥3 headings
+started with a number, and the AMD 10-K's only "numbered" headings were 5 false
+positives (`3.924% Senior Notes`, `2.125% Notes`, `7.50% Senior Notes`,
+`1. Financial Statements`, `2. Exhibits`). Consequences: many LLM descriptions just
+rephrased the title, and some titles carried `***` emphasis
+(`***Original Equipment Manufacturers***`). Improve the structure extraction
+(keeping it robust for more-structured documents), then rerun and report.
+**Scope:** `genai-graph` (`tree_parser`, `outline_extract`, `commands_docgraph`);
+the `financebench` docgraph profile (temp 0, graph-only) from 1.2 is unchanged.
+
+## TL;DR (Phase 1.3)
+
+| Metric | Phase 1.2 (hybrid v1) | Phase 1.3 (hybrid v2) | Δ |
+|---|---|---|---|
+| Questions | 7 | 7 | — |
+| **Accuracy (strict correct)** | 7/7 = 100% | **6/7 = 85.7%** | **−1** (`_00757` → partial) |
+| Accuracy (correct-or-partial) | 100% | 100% | — |
+| Groundedness | 7/7 = 100% | 7/7 = 100% | — |
+| Numeric match | 3/3 = 100% | 2/3 = 66.7% | −1 (`_00757`) |
+| Avg tool calls / question | 5.43 | **4.14** | **−24%** |
+| Avg input tokens / question | 59,410 | **49,035** | **−17.5%** |
+| Avg output tokens / question | 1,757 | 1,540 | −12.3% |
+| File-tool calls (corpus access) | 0 | 0 | graph-only holds |
+| Agent temperature | 0.0 | 0.0 | reproducible |
+| Agent errors | 0 | 0 | — |
+
+The rebuilt graph restores the **real heading hierarchy**
+(`{1:98, 2:63, 3:55, 4:31, 5:3}` vs 1.2's degenerate `{1:176, 2:15, 3:59}`),
+strips `***` emphasis from titles, and gives every non-divider section a concrete
+(non-title-restating) description. The agent is **~24% cheaper in tool calls and
+~17% cheaper in input tokens**, with groundedness still perfect. One numeric
+regression (`_00757`) is a **retrieval-precision** issue (the agent retrieved the
+accounts-receivable concentration note instead of the net-revenue concentration),
+not a structural failure — see below.
+
+## What changed
+
+### 1. Heading levels restored (`tree_parser._infer_levels`)
+
+`_infer_levels` was overriding Markdown-it's own (correct) heading levels whenever
+≥3 headings started with a number. The AMD 10-K's only "numbered" headings are 5
+false positives (interest-rate note titles + `1. Financial Statements` / `2.
+Exhibits`); once triggered it forced everything before the first number to level 1,
+collapsing the hierarchy to `{1:176, 2:15, 3:59}`.
+
+- **Tightened `_OUTLINE_NUMBER_RE`** to require the number be followed by
+  whitespace / `.` / end-of-string, so `3.924% Senior Notes` (an interest rate,
+  not an outline item) is rejected while `1. Financial Statements` and `3.4
+  Device life cycle` are kept.
+- **Degeneracy gate on `_infer_levels`**: it now returns the Markdown levels
+  **unchanged** unless they are degenerate (≤1 distinct levels, or the modal level
+  is ≥85% of headings) — and only then (and only if ≥3 numbered headings exist)
+  does it re-derive from outline numbers. This makes well-structured Markdown
+  authoritative; only genuinely flat documents fall back to outline-number
+  inference, so more-structured documents keep their native hierarchy.
+
+Result on AMD: `{1:98, 2:63, 3:55, 4:31, 5:3}` (250 headings) — the real
+PART I/ITEM 1 → Our Industry/Data Center Segment → Data Center Market nesting.
+Reconstruction is byte-for-byte intact.
+
+### 2. Emphasis stripped from titles (`tree_parser.detect_headings`)
+
+Added `_strip_surrounding_emphasis` (unwraps balanced `***foo***`, then trims
+unbalanced dangling `*`/`_` glued to text; backticks excluded to protect inline
+code) and applied it in `detect_headings`. `***Original Equipment Manufacturers***`
+→ `Original Equipment Manufacturers`. 0 residual emphasis titles across all 250.
+
+### 3. Richer, non-restating descriptions (`outline_extract`)
+
+- `OutlineEntry.description` made optional (`str | None`).
+- **Prompt rewrite:** require CONCRETE subject matter (entities/metrics/products/
+  scope), forbid restating the title, return `null` for structural dividers
+  (`PART I`, `FORM 10-K`, `INDEX`, repeated company-name headers), with few-shot
+  BAD/GOOD examples.
+- **Restatement post-filter** (`_is_title_restatement`): drops any description
+  whose significant (non-stopword) words are a subset of the title's — so
+  "Customers → Describes the customers section" is dropped to `null`.
+- **Policy hash `hybrid-v1` → `hybrid-v2`** (cache invalidation; new cache dir
+  `deepseek_v4flash_openrouter__5cab039c8230`).
+
+Result: 31/250 null descriptions (the structural dividers), the rest substantive —
+e.g. *Data Center Products → "Lists EPYC CPUs, Instinct GPUs, Pensando DPUs, Alveo
+FPGAs, and Versal Adaptive SoCs."*; *Our Strategy → "Lists five strategic
+pillars…"*. Rebuild cost: **1 LLM call** (cache cold after the hash bump).
+
+### 4. CLI TOC YAML serialization fix (`commands_docgraph.py`)
+
+`cli docgraph toc <id> --yaml` had been producing **invalid YAML** (continuation
+lines landing at column 1, failing `yaml.safe_load`) whenever a
+ description/summary line wrapped past the terminal width. Root cause: the command
+routed the YAML string through Rich's `console.print`, which re-wraps text to the
+terminal width and **drops indentation from wrapped continuations**. Fixed by
+emitting with `console.print(..., soft_wrap=True)` in the `toc` and `folder-toc`
+commands (3 call-sites). The agent-facing `document_toc_yaml` tool was never
+affected (it returns the string directly, not through Rich).
+
+## Per-question results (Phase 1.3)
+
+| financebench_id | Reasoning | Verdict | Numeric | Ground | Tool calls | In tok | Out tok |
+|---|---|---|---|---|---|---|---|
+| _00222 | Logical/numerical | **correct** ✅ | True | grounded | 3 | 19,316 | 1,175 |
+| _00563 | — | **correct** ✅ | True | grounded | 3 | 20,969 | 1,003 |
+| _00757 | — | **partial** ⚠️ | False | grounded | 4 | 18,713 | 601 |
+| _00917 | Logical/numerical | **correct** ✅ | null | grounded | 5 | 89,204 | 3,885 |
+| _00995 | Info extraction | **correct** ✅ | null | grounded | 5 | 73,805 | 1,444 |
+| _01198 | Numerical | **correct** ✅ | null | grounded | 5 | 74,085 | 1,756 |
+| _01279 | Numerical | **correct** ✅ | null | grounded | 4 | 47,155 | 913 |
+
+Numeric verdicts: `_00222` quick ratio = **1.57** (correct); `_00563` = **Data
+Center** (largest proportional sales increase excl. Embedded); `_00757` = **18% of
+accounts receivable** (see regression detail — gold wanted 16% of net revenue).
+
+### Regression detail — `_00757` (customer concentration)
+
+- **Question:** Did AMD report customer concentration in FY22?
+- **Gold:** Yes — one customer accounted for **16% of consolidated net revenue**.
+- **Agent:** Yes — in Note 10 (Concentrations of Credit Risk), one customer
+  accounted for **~18% of total consolidated accounts receivable** (and two
+  customers at 20%/15% of A/R for the prior year).
+- **Diagnosis:** a **retrieval-precision** regression, not a structural one. The
+  agent searched `search_sections(keyword="concentration")`, which matched
+  **Note 10 – Concentrations of Credit Risk** (the *accounts-receivable*
+  concentration disclosure) rather than the *net-revenue* customer-concentration
+  disclosure the gold answer cites. The 10-K has two distinct "concentration"
+  notes; the improved (more direct) TOC led the agent to search-and-stop on Note
+  10, where Phase 1.2's heavier probing (15 calls) happened to surface the revenue
+  figure. The answer is directionally correct ("yes, concentration exists") and
+  fully grounded, hence **partial**, not **incorrect**.
+- **Fix direction:** a `search_sections` alias/thesaurus (e.g. "customer
+  concentration" → also probe "net revenue", "significant customer", revenue
+  disaggregation) or returning sibling concentration notes together.
+
+## Trajectory analysis (Phase 1.3)
+
+**Tool frequency (7 questions, 29 calls):** `get_section_content` 11,
+`get_folder_toc` 7, `search_sections` 5, `get_document_toc` 4, `read_file` 2
+(overflow pagination only). vs Phase 1.2 (38 calls): `search_sections`
+11→5 (−55%), `get_section_content` 14→11, `get_document_toc` 5→4,
+`get_folder_toc` 7→7. Total −24%.
+
+**Why cost fell further:** the restored heading levels + concrete descriptions let
+the agent pick the right section from the TOC *first time* — fewer
+`search_sections` probes (5 vs 11) and fewer `get_document_toc` re-maps. Every
+question still opens with `get_folder_toc` (orient), then either
+`get_document_toc` (map) or `search_sections` (target), then
+`get_section_content` (read), then answer citing `[hash::seq]`.
+
+**Navigation nuance:** on the two broadest questions (`_00917` operating margin,
+`_01198` revenue drivers) the agent read 3–4 sections each (the highest call
+counts, 5/q) — these genuinely span multiple MD&A sub-sections, so the extra
+reads are warranted, not waste.
+
+## Caveats & findings (Phase 1.3)
+
+1. **`_00757` retrieval precision** — see regression detail above. The single
+   accuracy/numeric loss; directionally correct and grounded.
+2. **`_00995` overflow `read_file` (2 calls)** — both target
+   `/large_tool_results/<call_id>` with `offset`/`limit`: deepagents' pagination of
+   a large graph-retrieved `get_section_content` result, not filesystem access (no
+   corpus leak). Same residual as 1.2.
+3. **Judge numeric classification** — 3 questions classified numeric (unchanged
+   from 1.2); 2/3 matched.
+4. **YAML serialization was a real CLI bug** (now fixed) — the agent-facing path
+   was never affected, but `cli docgraph toc --yaml` had been emitting unparseable
+   YAML whenever a description/summary line wrapped past the terminal width.
+
+## Improvement backlog (Phase 1.3 → next)
+
+1. **`search_sections` thesaurus / concentration-class probe** — directly
+   addresses the `_00757` regression: expand a keyword to its disclosure-class
+   aliases so one search surfaces all concentration notes (A/R + net revenue).
+2. **Larger question set** — 7 questions on one 10-K is still thin; expand to
+   multiple filings to stress cross-document routing.
+3. **Table/line-item node type** — make balance-sheet line items first-class
+   retrievable so numeric questions don't require reading+parsing whole statement
+   Markdown.
+4. **Overflow `read_file` provenance** — annotate the `/large_tool_results/` path
+   so traces make its non-filesystem nature explicit.
+
+## Reproducing Phase 1.3
+
+```bash
+# Hybrid-v2 outline rebuild from the existing OCR markdown (1 LLM call, cache cold after policy-hash bump):
+uv run python -m financebench.bench.build_graph --skip-ocr --force --llm
+# Graph-only, temperature-0 run + judge:
+uv run python -m financebench.bench.run_questions
+uv run python -m financebench.bench.grade
+```
+
+Outline cache: `data/kg/financebench_tree_outlines/deepseek_v4flash_openrouter__5cab039c8230/`
+(gitignored). The `genai-graph` changes (`tree_parser`, `outline_extract`,
+`commands_docgraph`) are committed alongside this report.
