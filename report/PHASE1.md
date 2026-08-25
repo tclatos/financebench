@@ -315,3 +315,206 @@ uv run python -m financebench.bench.grade
 
 The outline LLM call is content-addressed and cached under
 `data/kg/financebench_tree_outlines/` (gitignored), so re-builds are free.
+
+---
+
+# FinanceBench Phase 1.2 — Hybrid outline + benchmark-integrity fixes + deterministic re-run
+
+**Date:** 2026-08-25
+**Trigger:** Phase 1.1's LLM outline produced only 27 coarse sections (each a
+whole 10-K item → ~176k tok/q, 2.4× Phase 1) and ignored Markdown heading
+levels; plus four benchmark-integrity caveats from the Phase-1.1 report (file
+tools on, empty relationship tables, summaries opt-in, non-determinism). Address
+all four and re-run.
+**Scope:** `genai-graph` (hybrid outline + ingest bug fix), `genai-tk` (tool-
+exclusion config), `financebench` (docgraph profile + inlined strategy).
+
+## TL;DR (Phase 1.2)
+
+| Metric | Phase 1.1 (LLM, 27 sections) | Phase 1.2 (hybrid, 251 sections) | Δ |
+|---|---|---|---|
+| Questions | 7 | 7 | — |
+| **Accuracy (strict correct)** | 7/7 = 100% | **7/7 = 100%** | — (now graph-only, not an upper bound) |
+| Groundedness | 7/7 = 100% | 7/7 = 100% | — |
+| Numeric match | 2/2 = 100% | 3/3 = 100% | — (judge classified 3 numeric; all match) |
+| Avg tool calls / question | 13.4 | **5.43** | **−59%** |
+| Avg input tokens / question | 176,657 | **59,410** | **−66%** |
+| Avg output tokens / question | 2,344 | 1,757 | −25% |
+| File-tool calls (corpus access) | `read_file`/`grep` present | **0** | graph-only achieved |
+| Agent temperature | default (non-det) | **0.0 (deterministic)** | reproducible |
+| Agent errors | 0 | 0 | — |
+
+Same 100% accuracy and groundedness, now at ~1/3 the input-token cost, with
+file tools disabled and temperature 0 — so the score is a true, reproducible
+**graph-only** result rather than a non-deterministic upper bound.
+
+## What changed
+
+### Build: hybrid heading-anchored outline (27 → 251 sections)
+
+The LLM outline now anchors to the **algorithmically detected Markdown headings**
+(H1/H2/H3) instead of inventing a coarse 27-entry TOC.
+
+- `tree_parser` dedupes repeated zero-body page-headers (258 → 250 headings on AMD).
+- `outline_extract._build_prompt` lists every detected heading (`[Llevel] title`)
+  and asks the LLM for one `description`/`summary` per heading; `_align_outline`
+  matches the LLM entries back to the authoritative detected headings before
+  caching. Policy hash bumped to `hybrid-v1` (cache `34975673e354`).
+- `outline_merge.merge_outline` slices on the detected headings and attaches
+  `description`/`summary` by index (title-anchored reconciliation only as a
+  count-mismatch fallback).
+
+| Graph property | Phase 1.1 (LLM outline) | Phase 1.2 (hybrid) |
+|---|---|---|
+| MarkdownSection nodes | 27 | **251** |
+| Heading levels | flat (all level 1) | **{1:176, 2:15, 3:59}** |
+| Sections with `description` | 26 / 27 | **250 / 250** |
+| Sections with `summary` | 9 / 27 | 9 / 251 |
+| ITEM 8 granularity | one block | **Balance Sheets / Statements / Notes / NOTE 1–17** |
+| Outline LLM calls on rebuild | 1 | **0 (cache warm)** |
+
+The 251 fine-grained sections let the agent read a **targeted balance-sheet
+chunk** instead of all of ITEM 8 — the direct cause of the ~66% token drop.
+
+### Caveat fixes
+
+1. **File tools disabled (graph-only).** Added `excluded_tools` to `genai-tk`'s
+   `AgentProfileConfig`; `_create_deep_agent` appends deepagents'
+   `_ToolExclusionMiddleware(excluded=...)` last in the user middleware chunk
+   (after NeMo relay), stripping the built-in tools from the model's tool list
+   each turn. The docgraph profile excludes
+   `ls, read_file, grep, glob, write_file, edit_file, execute, task`. The agent
+   can no longer read `data/markdown/*.md` or delegate to the general-purpose
+   subagent (`task`); the four graph tools (`list_documents`, `get_folder_toc`,
+   `get_document_toc`, `get_section_content`, `search_sections`) are the sole
+   retrieval path. Because skills are unreadable without `read_file`,
+   `prepare_docgraph_profile` skips skill loading (and the filesystem backend)
+   in graph-only mode and the `financebench-qa` navigation strategy is inlined
+   into the docgraph system prompt instead.
+   - **Verified in traces:** 0 calls to `ls/grep/glob/write_file/edit_file/
+     execute/task` across all 7 questions. The single `read_file` call observed
+     (`_00995`) targeted `/large_tool_results/<call_id>` — deepagents'
+     overflow-recovery pagination of an already-graph-retrieved
+     `get_section_content` result, not filesystem access (no `FilesystemBackend`
+     in graph-only mode). The agent never touched the source markdown.
+2. **Empty relationship tables fixed.** Root cause: `merge.py::
+   merge_relationships_batch`'s no-property branch used a two-stage
+   `LOAD FROM ... WITH from, to_id MATCH ... MATCH ... MERGE` — the `WITH`
+   dropped the `LOAD FROM` column binding after the first `MATCH`, so the
+   second `MATCH` matched nothing → 0 rows. Replaced with a batch-inline
+   `LOAD FROM arrow_rel_table MATCH (from{key:from_id}), (to{key:to_id}) MERGE`
+   (point lookups, no cross product), and `total_created` now uses a
+   before/after count delta (MERGE is idempotent → exact) instead of
+   `len(row_data)`. Rebuilt: `HAS_SECTION=1`, `HAS_SUBSECTION=250`,
+   `CONTAINS=1` (was 0/0/0). The navigation tools still don't traverse edges,
+   but edge counts are now a trustworthy build-quality signal.
+3. **Summaries on by default.** Flipped `include_summaries` default `False`→
+   `True` in `build_toc_tree`, `document_toc_yaml`, `folder_toc_yaml` and the
+   `get_document_toc` tool. Cost scales with how many sections were summarised
+   (only 9/251 here) so it's cheap; verified the live AMD TOC now emits all 9
+   per-section summaries + the document summary.
+4. **Determinism.** Agent + judge both run at temperature 0.0 (`genai-tk`
+   `llm_factory.common_params` applies `temperature: 0.0` to every LLM). Re-ran
+   to confirm the `_00222`=1.57 fix is structural, not sampling luck.
+
+## Per-question results (Phase 1.2)
+
+| financebench_id | Reasoning | Verdict | Numeric | Ground | Tool calls | In tok | Out tok |
+|---|---|---|---|---|---|---|---|
+| _00222 | Logical/numerical | **correct** ✅ | True | grounded | 3 | 23,854 | 1,205 |
+| _00563 | — | **correct** ✅ | True | grounded | 5 | 58,138 | 2,300 |
+| _00757 | — | **correct** ✅ | True | grounded | 15 | 126,139 | 1,720 |
+| _00917 | Logical/numerical | **correct** ✅ | null | grounded | 5 | 86,042 | 3,517 |
+| _00995 | Info extraction | **correct** ✅ | null | grounded | 4 | 62,667 | 1,324 |
+| _01198 | Numerical | **correct** ✅ | null | grounded | 3 | 39,139 | 1,480 |
+| _01279 | Numerical | **correct** ✅ | null | grounded | 3 | 19,891 | 755 |
+
+Numeric verdicts: `_00222` quick ratio = **1.57** (= (cash $4,835M + ST
+investments $1,020M + AR $4,126M) / current liabilities $6,369M, citing
+`[f391da52bf0af1c2::130]`); `_00563` = **Data Center** (64% growth, largest
+proportional increase excl. Embedded); `_00757` = **one customer = 16%** of
+consolidated net revenue.
+
+vs Phase 1.1 per-q input tokens: `_00222` 151,236→23,854 (−84%), `_00563`
+225,904→58,138, `_00757` 424,066→126,139 (−70%), `_00917` 127,251→86,042,
+`_00995` 109,917→62,667, `_01198` 58,045→39,139, `_01279` 140,182→19,891
+(−86%). Every question cheaper; the biggest savings are on the high-cost
+Phase-1.1 questions where coarse sections forced huge reads.
+
+## Trajectory analysis (Phase 1.2)
+
+**Tool frequency (7 questions, 38 calls):** `get_section_content` 14,
+`search_sections` 11, `get_folder_toc` 7, `get_document_toc` 5, `read_file` 1
+(overflow pagination only). vs Phase 1.1: `search_sections` 41→11 (−73%),
+`get_document_toc` 11→5, `get_section_content` 14→14 (unchanged — the agent
+still reads ~2 sections/q, but now targeted sub-sections, not whole items).
+
+**Why cost fell ~66%:** the hybrid outline's 251 fine-grained sections (ITEM 8
+splits into Balance Sheets / Statements / Notes / NOTE 1–17) mean each
+`get_section_content` returns a targeted chunk (e.g. just the Consolidated
+Balance Sheets) instead of all of ITEM 8. Better routing (a `description` on
+every section + summaries on by default) means fewer `search_sections` probes
+and fewer `get_document_toc` re-maps — the agent reads the right small section
+first time.
+
+**Navigation pattern (clean and consistent):** every question opens with
+`get_folder_toc` (orient → `AMD_2022_10K`, now showing the doc `description`+
+`summary`), then either `get_document_toc` (map the section tree) or
+`search_sections` (targeted keyword), then `get_section_content` (read the
+matching sections), then answer citing `[hash::sequence]`. `_00757` (customer
+concentration) is the outlier at 15 calls (heavy `search_sections` probing
+across NOTE 10 Concentrations of Credit Risk + risk factors), but still correct
+and grounded.
+
+## Caveats & findings (Phase 1.2)
+
+1. **`_00995` overflow `read_file`:** one `read_file` call
+   (`/large_tool_results/<call_id>`) is deepagents' pagination of a large
+   `get_section_content` result, not filesystem access — no corpus leak. It
+   re-reads graph-retrieved content only. Could be eliminated by also stripping
+   `read_file` from the tool node, but that would prevent the agent paginating
+   large section reads (which can hurt) — left as-is.
+2. **Skill loading skipped in graph-only mode:** because `read_file` is
+   excluded, `SkillsMiddleware` could not read any `SKILL.md`; loading skills
+   would inject a "use `read_file` for full instructions" prompt pointing at a
+   tool the agent lacks. The navigation strategy is therefore inlined in the
+   docgraph system prompt (the `financebench-qa` SKILL.md is now documentation-
+   only for this profile). If file tools are re-enabled, skill loading resumes.
+3. **Empty rel tables were a real ingest bug** (now fixed) — see caveat fix #2.
+4. **Judge numeric classification:** the judge marked 3 questions numeric
+   (Phase 1.1 marked 2). The same flash judge (temp 0) classifies "is a number
+   expected" per question; the count can shift slightly run-to-run but all
+   matched, so accuracy is unaffected.
+
+## Improvement backlog (Phase 1.2 → next)
+
+1. **Larger question set:** 7 questions on one 10-K is a thin benchmark; expand
+   to multiple filings (e.g. the full FinanceBench AMD set + other issuers) to
+   stress routing across documents and reduce per-question variance.
+2. **Stronger reasoning model on the numeric subset:** evaluate a GPT-5/o3-class
+   model on the numeric questions to test whether graph-only + hybrid routing
+   holds for harder multi-step numerics.
+3. **Table/line-item node type:** add structured table nodes to the Document
+   Graph so line items (e.g. "Cash and cash equivalents $4,835M") are first-class
+   retrievable objects — removes the agent's need to read+parse whole
+   balance-sheet Markdown.
+4. **Reproducible eval recipe:** a `just bench` recipe (load → fetch → build →
+   run → grade → report) + a frozen `runs.jsonl`/`scores.jsonl` snapshot for
+   regression checks.
+5. **Overflow `read_file` provenance:** optionally annotate the tool-result
+   overflow path so traces make the `/large_tool_results/` provenance explicit
+   (it currently looks like a file read).
+
+## Reproducing Phase 1.2
+
+```bash
+# Hybrid outline rebuild from the existing OCR markdown (cached, 0 LLM calls on re-run):
+uv run python -m financebench.bench.build_graph --skip-ocr --force --llm
+# Graph-only, temperature-0 run + judge:
+uv run python -m financebench.bench.run_questions
+uv run python -m financebench.bench.grade
+```
+
+Agent profile: `config/agents.yaml` `docgraph` (`excluded_tools`, inlined
+strategy, temp 0). Outline cache: `data/kg/financebench_tree_outlines/
+deepseek_v4flash_openrouter__34975673e354/` (gitignored).
