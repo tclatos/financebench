@@ -36,11 +36,9 @@ from financebench.bench.run_questions import RUNS_PATH
 SCORES_PATH = FB_DIR / "scores.jsonl"
 
 _JUDGE_SYSTEM = """\
-You are a strict grader for FinanceBench, a financial QA benchmark.
+You are a strict-but-fair grader for FinanceBench, a financial QA benchmark.
 Compare the agent's answer to the gold answer using the gold evidence and
-justification. Financial answers are often a number or a short factual claim;
-grade on whether the agent's answer is substantively correct, in the right
-units and rounding, and grounded in the source (not hallucinated).
+justification. Financial answers are often a number or a short factual claim.
 
 Return ONLY a JSON object with exactly these keys:
 {
@@ -50,13 +48,28 @@ Return ONLY a JSON object with exactly these keys:
   "rationale": "<one sentence>"
 }
 
-Rules:
-- "correct" = the agent's answer matches the gold answer's substance (number
-  within ~2% tolerance, or same factual claim). "partial" = right direction but
-  wrong value/units or incomplete. "incorrect" = wrong or missing.
+Equivalence rules (adopted from Mafin2.5):
+- Numerical accuracy: rounding differences are IGNORED when they do not change
+  the conclusion. Allow flexibility: 1.2 is similar to 1.23 (one rounds to the
+  other). Fractions, percentages, and decimals can be equivalent: "11 of 14" is
+  equivalent to 79% and to 0.79.
+- The agent answer is CORRECT if the gold answer, or any of its equivalences,
+  can be INFERRED or generated from the agent's answer, or implicitly exists in
+  it.
+- If the agent answer is a SUPERSET of the gold answer, it is correct.
+- If the agent answer conveys the same or similar meaning, conclusion, or
+  rationale as the gold, it is correct.
+- A reasonable alternative interpretation (justifiable vs the gold) is correct.
+- Otherwise it is incorrect.
+
+Tiers:
+- "correct" = the agent answer matches the gold answer's substance under the
+  equivalence rules above (number within rounding/fraction equivalence, or same
+  factual claim). "partial" = right direction but wrong value/units, incomplete,
+  or only partly substantiated. "incorrect" = wrong or missing.
 - "numeric_match" = true if a number was expected and the agent's number matches
-  the gold number (within ~2%); false if a number was expected and it does not
-  match; null if no specific number was expected.
+  the gold under the equivalence rules (rounding/fraction/percent); false if a
+  number was expected and it does not match; null if no specific number expected.
 - "groundedness" = whether the agent's answer is supported by the cited/source
   text rather than invented. "ungrounded" if it states facts not in the filing.
 - Ignore any reasoning preamble in the agent's answer (e.g. "Now let me check
@@ -135,14 +148,23 @@ async def _grade_one(judge_llm_id: str, run: dict) -> dict:
     }
 
 
-async def _grade_all(runs: list[dict], judge_llm_id: str) -> list[dict]:
-    """Grade every run sequentially (deterministic, rate-limit friendly)."""
+async def _grade_all(
+    runs: list[dict],
+    judge_llm_id: str,
+    *,
+    scores_path: Path | None = None,
+) -> list[dict]:
+    """Grade every run sequentially (deterministic, rate-limit friendly).
+
+    *scores_path* overrides where JSONL verdicts are appended (default ``SCORES_PATH``).
+    """
+    out_path = scores_path or SCORES_PATH
     scores: list[dict] = []
     for i, run in enumerate(runs, 1):
         logger.info("[{}/{}] grading {}", i, len(runs), run["financebench_id"])
         score = await _grade_one(judge_llm_id, run)
         scores.append(score)
-        with SCORES_PATH.open("a", encoding="utf-8") as fh:
+        with out_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(score, ensure_ascii=False) + "\n")
         logger.info(
             "  → {} (numeric={}) [{}]",

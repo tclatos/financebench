@@ -86,3 +86,7 @@ bench-run:
 bench-grade:
     uv run python -m financebench.bench.grade
 
+# Phase-3 multi-doc corpus-wide bench (temp 0): build hybrid graph + run + grade
+bench-multi:
+    uv run python -m financebench.bench.run --skip fetch
+

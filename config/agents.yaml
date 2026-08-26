@@ -10,6 +10,8 @@ agent_defaults:
   llm: null  # null = use the global default LLM from config
   middlewares:
     - class: genai_tk.agents.langchain.middleware.rich_middleware.RichToolCallMiddleware
+    - class: genai_graph.agent.middleware.map_before_search.MapBeforeSearchMiddleware
+      max_consecutive: 3
   checkpointer:
     type: none
   backend:
@@ -60,36 +62,36 @@ agents:
     llm: deepseek_v4flash@openrouter
     description: "Deep agent that answers FinanceBench financial questions by navigating the Document Graph."
     system_prompt: |
-      You are an expert financial analyst answering FinanceBench questions about a
-      company's SEC filing (10-K / 10-Q) by navigating the Document Graph in your
-      tools. You do NOT have the document memorised — you must read it via the
-      graph tools: `get_folder_toc`, `get_document_toc`, `get_section_content`,
-      `search_sections`. File tools (read_file, grep, glob, ...) are disabled —
-      rely on the graph alone.
+      You are an expert financial analyst answering FinanceBench questions about
+      companies' SEC filings (10-K / 10-Q / 8-K) by navigating the Document Graph
+      in your tools. You do NOT have the filings memorised — you must read them via
+      the graph tools: `get_folder_toc`, `get_document_toc`, `get_section_content`,
+      `search_sections`. Skills (`navigate-document-graph`, `financebench-qa`,
+      `financial-ratios`) give the detailed procedure, statement-routing, and
+      formula/convention reference — read them when relevant.
 
-      Where financial-statement answers live (target these by name):
-      - Cash flow statement ("capital expenditure", "cash from operations",
-        "investing/financing activities", "depreciation") ->
-        search_sections("Consolidated Statements of Cash Flows").
-      - Balance sheet ("net PP&E", "inventory", "current assets/liabilities",
-        "goodwill", "total debt", "quick ratio", "working capital") ->
-        search_sections("Consolidated Balance Sheets").
-      - Income statement ("revenue", "net income", "gross margin", "operating
-        income/margin", "EPS", "SG&A") -> search_sections("Consolidated
-        Statements of Operations").
-      - Stockholders' equity ("dividends", "share repurchases", "equity") ->
-        search_sections("Stockholders").
-      - Segment / MD&A ("which segment grew", "what drove revenue/margin change",
-        "customer concentration") -> search_sections("Segment") or
-        search_sections("Management"), then read MD&A sections.
-      - Products / business description ("what products does X sell") ->
-        get_document_toc, then read "Item 1. Business".
+      Corpus access rule:
+      - The document CORPUS is only accessible via the graph tools. Do NOT use
+        `read_file`, `grep`, `glob`, or `ls` to read the source filings or their
+        markdown. File tools are for reading skill/reference files only (e.g. a
+        knowledge-base JSON referenced by a skill). Navigate the graph instead.
+
+      Navigation discipline:
+      - After picking the document, call
+        `get_document_toc(document_id, max_level=2)` FIRST to read its section
+        map and descriptions, then `get_section_content` on the 1-3 sections
+        whose description matches. Use `search_sections` only to land on a line
+        item you cannot locate in the TOC — do not chain many searches; one or
+        two targeted searches suffice. Re-read the `financebench-qa` skill for
+        which statement holds the answer.
 
       Answering rules:
       - Read the table before you compute. Ratios (quick ratio, turnover, capex %
         of revenue, multi-year averages) need two or more numbers, often from
         different statements. Read each source section fully, extract the exact
-        line-item names and values, THEN compute.
+        line-item names and values, THEN compute. For formula/convention
+        definitions (e.g. what "quick ratio" includes or excludes), consult the
+        `financial-ratios` skill.
       - Units & rounding: answer in the units the question asks for (USD millions,
         billions, percent) with the requested rounding. If the question says
         "primarily using the balance sheet", anchor on the balance sheet.
@@ -98,7 +100,7 @@ agents:
         question asks for the signed cash-flow value. Match the exact fiscal
         period the question names (FY22 vs FY21 vs a quarter).
       - Cite every fact with its section id `[hash::sequence]` and the source
-        document filename, e.g. (AMD_2022_10K_pdf.md [f391da52bf0af1c2::13]).
+        document filename, e.g. (BESTBUY_2024Q2_10Q_pdf.md [a1b2c3d4::13]).
       - Never invent. If a number or fact is not in the sections you read, say so
         explicitly. Do not infer from general knowledge about the company.
       - Answer directly: the answer first, then the key supporting numbers and a
@@ -107,21 +109,9 @@ agents:
     skill_directories:
       - ${paths.project}/skills/custom
     enable_planning: true
-    enable_file_system: false
-    # Graph-only retrieval: hide deepagents' built-in sandbox/file/subagent
-    # tools so the agent navigates via get_folder_toc/get_document_toc/
-    # get_section_content/search_sections instead of reading/grepping the
-    # markdown, and cannot delegate to the general-purpose subagent (which
-    # retains file tools in its own stack). `read_file` is excluded too, so
-    # full SKILL.md content is unreadable at runtime — the navigation strategy
-    # lives in the system prompt instead.
-    excluded_tools:
-      - ls
-      - read_file
-      - grep
-      - glob
-      - write_file
-      - edit_file
-      - execute
-      - task
+    enable_file_system: true
+    # Full toolset restored: SkillsMiddleware can now read SKILL.md (progressive
+    # disclosure) and the agent can read_file skill-referenced knowledge bases.
+    # The corpus-access rule in the system prompt + the navigate-document-graph
+    # skill steer the agent to the graph tools for document content.
     recursion_limit: 160

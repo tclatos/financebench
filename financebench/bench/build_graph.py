@@ -98,19 +98,31 @@ def _ocr_pdf(pdf_path: Path) -> str:
     return _markitdown_text(pdf_path)
 
 
-def markdownize_target(doc_name: str, *, force: bool) -> Path:
-    """OCR the target PDF to the OneDrive mirror and return the produced .md path."""
+def markdownize_target(
+    doc_name: str,
+    *,
+    force: bool,
+    pdfs_dir: Path | None = None,
+    onedrive_markdown_dir: Path | None = None,
+) -> Path:
+    """OCR the target PDF to the OneDrive mirror and return the produced .md path.
+
+    *pdfs_dir* and *onedrive_markdown_dir* default to the bench constants so the
+    standalone CLI keeps working; the orchestrator passes config-driven paths.
+    """
     from genai_tk.workflow.markdownize.routing import _write_markdown
 
     ensure_dirs()
     load_env()
-    pdf_path = PDFS_DIR / f"{doc_name}.pdf"
+    pdf_base = pdfs_dir or PDFS_DIR
+    onedrive_base = onedrive_markdown_dir or ONEDRIVE_MARKDOWN_DIR
+    pdf_path = pdf_base / f"{doc_name}.pdf"
     if not pdf_path.exists():
         raise SystemExit(f"PDF not found: {pdf_path} — run fetch_pdf first.")
 
-    ONEDRIVE_MARKDOWN_DIR.mkdir(parents=True, exist_ok=True)
+    onedrive_base.mkdir(parents=True, exist_ok=True)
     md_name = f"{doc_name}{MD_FILENAME_SUFFIX}"
-    md_path = ONEDRIVE_MARKDOWN_DIR / md_name
+    md_path = onedrive_base / md_name
 
     if md_path.exists() and not force:
         logger.info("Markdown already present (use --force to re-OCR): {}", md_path)
@@ -125,10 +137,18 @@ def markdownize_target(doc_name: str, *, force: bool) -> Path:
     return md_path
 
 
-def copy_markdown_to_project(md_path: Path) -> Path:
-    """Copy the OneDrive markdown into ``data/markdown/`` for graph ingestion."""
+def copy_markdown_to_project(
+    md_path: Path, *, markdown_dir: Path | None = None
+) -> Path:
+    """Copy *md_path* into the project markdown dir for graph ingestion.
+
+    *markdown_dir* defaults to ``MARKDOWN_DIR`` so the standalone CLI keeps
+    working; the orchestrator passes a config-driven dir.
+    """
     ensure_dirs()
-    dest = MARKDOWN_DIR / md_path.name
+    md_base = markdown_dir or MARKDOWN_DIR
+    md_base.mkdir(parents=True, exist_ok=True)
+    dest = md_base / md_path.name
     shutil.copy2(md_path, dest)
     logger.info("Copied {} → {}", md_path, dest)
     return dest
@@ -143,8 +163,13 @@ def build_document_graph(
     summary_min_tokens: int = 800,
     workers: int = 4,
     context_safety_ratio: float = 0.9,
+    markdown_dir: Path | None = None,
+    kg_db: Path | None = None,
+    embeddings_id: str | None = None,
+    fts: bool = True,
+    chunk_size_tokens: int = 1500,
 ) -> dict:
-    """Build (or rebuild) the Document Graph from ``data/markdown/`` into the DB.
+    """Build (or rebuild) the Document Graph from the markdown dir into the DB.
 
     With *llm* resolved to a concrete id, the LLM-enhanced build path runs: a
     flash model extracts each document's outline (TOC + descriptions +
@@ -158,19 +183,22 @@ def build_document_graph(
         ingest_document_graph,
     )
     from genai_graph.kg.document_graph.outline_extract import OutlineConfig
+    from genai_graph.kg.document_graph.retrieval import RetrievalConfig
     from genai_graph.kg.factories.document_graph_factory import DocumentGraphFactory
 
     ensure_dirs()
-    md_files = list(MARKDOWN_DIR.glob("*.md"))
+    md_base = markdown_dir or MARKDOWN_DIR
+    db_path = kg_db or KG_DB
+    md_files = list(md_base.glob("*.md"))
     if not md_files:
         raise SystemExit(
-            f"No markdown found in {MARKDOWN_DIR} — run markdownize first."
+            f"No markdown found in {md_base} — run markdownize first."
         )
 
     resolved_llm = _resolve_build_llm(llm)
     outline_config: OutlineConfig | None = None
     if resolved_llm is not None:
-        cache_root = str(KG_DB.with_suffix("")) + "_outlines"
+        cache_root = str(Path(db_path).with_suffix("")) + "_outlines"
         outline_config = OutlineConfig(
             llm=resolved_llm,
             llm_max_tokens=llm_max_tokens,
@@ -179,21 +207,28 @@ def build_document_graph(
             context_safety_ratio=context_safety_ratio,
         )
 
+    retrieval_config: RetrievalConfig | None = None
+    if embeddings_id or fts:
+        retrieval_config = RetrievalConfig(
+            embeddings_id=embeddings_id, fts=fts, chunk_size_tokens=chunk_size_tokens
+        )
     logger.info(
-        "Building Document Graph: sources={} db={} force={} llm={}",
-        MARKDOWN_DIR,
-        KG_DB,
+        "Building Document Graph: sources={} db={} force={} llm={} embeddings={} fts={}",
+        md_base,
+        db_path,
         force,
         resolved_llm or "algo",
+        embeddings_id or "off",
+        fts,
     )
     backend = KuzuBackend()
-    backend.connect(str(KG_DB))
+    backend.connect(str(db_path))
     try:
         if force:
             logger.info("Dropping existing Document Graph tables at {}", KG_DB)
             drop_document_graph(backend)
         factory = DocumentGraphFactory(
-            sources=[str(MARKDOWN_DIR)],
+            sources=[str(md_base)],
             recursive=True,
             outline_config=outline_config,
         )
@@ -211,20 +246,25 @@ def build_document_graph(
                 files_degraded,
                 stats.llm_calls,
             )
-        result = ingest_document_graph(backend, factory, force=force)
+        result = ingest_document_graph(
+            backend, factory, force=force, retrieval_config=retrieval_config
+        )
     finally:
         backend.close()
 
     logger.success(
         "Graph built: {} processed ({} skipped), {} failed, {} sections, "
-        "{} summarized, {} relationships, {} degraded",
+        "{} chunks, {} summarized, {} relationships, {} degraded (embeddings={}, fts={})",
         result.documents_processed,
         result.documents_skipped,
         result.documents_failed,
         result.sections_created,
+        result.chunks_created,
         result.sections_summarized,
         result.relationships_created,
         files_degraded,
+        result.embeddings_model or "off",
+        result.fts_index or "off",
     )
     out = result.model_dump()
     out["files_degraded"] = files_degraded
@@ -285,6 +325,24 @@ def main(argv: list[str] | None = None) -> int:
         default=0.9,
         help="Degrade to algo parsing above this fraction of the context window (default: 0.9).",
     )
+    parser.add_argument(
+        "--embeddings",
+        default=None,
+        help="Embeddings model id for SectionChunk vectors (e.g. qwen3_06b@deepinfra). None disables the vector leg.",
+    )
+    parser.add_argument(
+        "--no-fts",
+        dest="fts",
+        action="store_false",
+        help="Disable the native FTS/BM25 index over section text.",
+    )
+    parser.set_defaults(fts=True)
+    parser.add_argument(
+        "--chunk-size-tokens",
+        type=int,
+        default=1500,
+        help="Target chunk size in tokens for long sections (default: 1500).",
+    )
     args = parser.parse_args(argv)
 
     load_env()
@@ -308,12 +366,18 @@ def main(argv: list[str] | None = None) -> int:
         summary_min_tokens=args.summary_min_tokens,
         workers=args.workers,
         context_safety_ratio=args.context_safety_ratio,
+        embeddings_id=args.embeddings,
+        fts=args.fts,
+        chunk_size_tokens=args.chunk_size_tokens,
     )
 
     print(f"doc={doc_name}")
     print(f"db={KG_DB}")
     print(f"outline_llm={result.get('outline_llm')}")
     print(f"sections_created={result.get('sections_created')}")
+    print(f"chunks_created={result.get('chunks_created')}")
+    print(f"embeddings_model={result.get('embeddings_model')}")
+    print(f"fts_index={result.get('fts_index')}")
     print(f"sections_summarized={result.get('sections_summarized')}")
     print(f"documents_processed={result.get('documents_processed')}")
     print(f"files_degraded={result.get('files_degraded')}")

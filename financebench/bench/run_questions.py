@@ -107,21 +107,46 @@ async def _run_one(harness: object, q: dict, llm: str) -> dict:
     }
 
 
-async def _run_all(questions: list[dict], llm: str, db_path: str) -> list[dict]:
-    """Build the agent once and run every question on its own thread."""
+async def _run_all(
+    questions: list[dict],
+    llm: str,
+    db_path: str,
+    *,
+    folder_id: str | None = None,
+    profile_name: str = DOCGRAPH_PROFILE,
+    runs_path: Path | None = None,
+    embeddings_id: str | None = None,
+) -> list[dict]:
+    """Build the agent once and run every question on its own thread.
+
+    *folder_id* scopes the agent to one folder (None = whole corpus).
+    *profile_name* selects the agent profile (default ``docgraph``).
+    *runs_path* overrides where JSONL rows are appended (default ``RUNS_PATH``).
+    *embeddings_id* enables the hybrid (vector + BM25) ``search_sections`` mode.
+    """
     from genai_tk.agents.harness.profiles import load_langchain_profiles
 
     from genai_graph.agent import create_docgraph_agent
 
+    out_path = runs_path or RUNS_PATH
     profiles = load_langchain_profiles()
-    if DOCGRAPH_PROFILE not in profiles:
+    if profile_name not in profiles:
         raise SystemExit(
-            f"Agent profile {DOCGRAPH_PROFILE!r} not found. Available: {sorted(profiles)}"
+            f"Agent profile {profile_name!r} not found. Available: {sorted(profiles)}"
         )
-    profile = profiles[DOCGRAPH_PROFILE]
+    profile = profiles[profile_name]
 
-    logger.info("Building docgraph agent (llm={}, db={})", llm, db_path)
-    harness = create_docgraph_agent(profile, llm=llm, db_path=db_path, folder_id=None)
+    logger.info(
+        "Building docgraph agent (profile={}, llm={}, db={}, folder={}, embeddings={})",
+        profile_name,
+        llm,
+        db_path,
+        folder_id,
+        embeddings_id or "off",
+    )
+    harness = create_docgraph_agent(
+        profile, llm=llm, db_path=db_path, folder_id=folder_id, embeddings_id=embeddings_id
+    )
 
     records: list[dict] = []
     try:
@@ -135,7 +160,7 @@ async def _run_all(questions: list[dict], llm: str, db_path: str) -> list[dict]:
             )
             record = await _run_one(harness, q, llm)
             records.append(record)
-            with RUNS_PATH.open("a", encoding="utf-8") as fh:
+            with out_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, ensure_ascii=False) + "\n")
             status = "ERROR" if record["error"] else "ok"
             logger.info(

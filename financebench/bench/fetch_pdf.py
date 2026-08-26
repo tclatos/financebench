@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 import httpx
 from loguru import logger
@@ -36,14 +37,17 @@ def resolve_doc_name(doc_name: str | None) -> str:
     )
 
 
-def fetch_pdf(doc_name: str) -> str:
-    """Download ``<doc_name>.pdf`` into ``data/pdfs/`` and return its path.
+def fetch_pdf(doc_name: str, *, pdfs_dir: Path | None = None) -> str:
+    """Download ``<doc_name>.pdf`` into the pdfs dir and return its path.
 
-    Skips the download when the file already exists.
+    *pdfs_dir* defaults to ``PDFS_DIR`` so the standalone CLI keeps working;
+    the orchestrator passes a config-driven dir. Skips an existing file.
     """
     ensure_dirs()
     load_env()
-    pdf_path = PDFS_DIR / f"{doc_name}.pdf"
+    base = pdfs_dir or PDFS_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    pdf_path = base / f"{doc_name}.pdf"
     if pdf_path.exists() and pdf_path.stat().st_size > 0:
         logger.info(
             "PDF already present: {} ({} bytes)", pdf_path, pdf_path.stat().st_size

@@ -104,14 +104,34 @@ def questions_for_doc(df: pd.DataFrame, doc_name: str) -> list[dict]:
     return rows
 
 
-def write_questions(df: pd.DataFrame, doc_name: str) -> list[dict]:
-    """Write the per-question JSONL for *doc_name* and record the selection."""
-    rows = questions_for_doc(df, doc_name)
+def questions_for_docs(df: pd.DataFrame, doc_names: list[str]) -> list[dict]:
+    """Return the question rows for several *doc_names* as JSON-safe dicts.
+
+    Rows are concatenated and re-sorted by ``financebench_id`` so a multi-doc
+    question set reads in a stable order.
+    """
+    rows: list[dict] = []
+    for name in doc_names:
+        rows.extend(questions_for_doc(df, name))
+    rows.sort(key=lambda r: str(r["financebench_id"]))
+    return rows
+
+
+def write_questions(df: pd.DataFrame, doc_names: str | list[str]) -> list[dict]:
+    """Write the per-question JSONL for *doc_names* (one or several) and record the selection.
+
+    Pass a single doc_name or a list; the rows for all named docs are written in
+    ``financebench_id`` order so the agent answers a multi-doc corpus.
+    """
+    names = [doc_names] if isinstance(doc_names, str) else list(doc_names)
+    rows = questions_for_docs(df, names)
     with QUESTIONS_PATH.open("w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    TARGET_PATH.write_text(doc_name, encoding="utf-8")
-    logger.info("Wrote {} questions to {}", len(rows), QUESTIONS_PATH)
+    TARGET_PATH.write_text(",".join(names), encoding="utf-8")
+    logger.info(
+        "Wrote {} questions for {} doc(s) to {}", len(rows), len(names), QUESTIONS_PATH
+    )
     return rows
 
 

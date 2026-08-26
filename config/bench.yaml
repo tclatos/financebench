@@ -1,0 +1,37 @@
+# FinanceBench evaluation config, consumed by `python -m financebench.bench.run`.
+# Paths are relative to the project root unless absolute. `~` is expanded.
+
+paths:
+  pdfs_dir: data/pdfs
+  markdown_dir: data/markdown_multi
+  kg_db: data/kg/financebench_multi.db
+  onedrive_markdown_dir: ~/OneDrive/prj/financebench/markdown
+  runs: data/financebench/runs.jsonl
+  scores: data/financebench/scores.jsonl
+
+llms:
+  agent: deepseek_v4flash@openrouter
+  build: deepseek_v4flash@openrouter
+  judge: deepseek_v4flash@openrouter
+
+build:
+  skip_ocr: false
+  force: true
+  llm: true              # true = LLM-enhanced outline build; false = algorithmic
+  workers: 4
+  summary_min_tokens: 800
+  context_safety_ratio: 0.9
+  embeddings: qwen3_06b@deepinfra  # SectionChunk vector model (null = no vector leg, keyword-only search)
+  fts: true                       # native BM25/FTS index over MarkdownSection(title, text, description)
+  chunk_size_tokens: 1500         # target chunk size for long sections
+
+questions:
+  docs:
+    - BESTBUY_2024Q2_10Q
+    - Pfizer_2023Q2_10Q
+    - JOHNSON_JOHNSON_2023_8K_dated-2023-08-30
+  limit: null
+
+agent:
+  profile: docgraph
+  folder_id: null         # null = whole corpus (agent must pick the right doc)
