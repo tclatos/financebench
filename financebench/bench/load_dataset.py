@@ -22,6 +22,7 @@ from collections import Counter
 import pandas as pd
 from datasets import load_dataset
 from loguru import logger
+import pathspec
 
 from financebench.bench._env import FB_DIR, ensure_dirs, load_env
 
@@ -29,6 +30,23 @@ DATASET_ID = "PatronusAI/financebench"
 DATASET_CACHE = FB_DIR / "financebench_merged.parquet"
 QUESTIONS_PATH = FB_DIR / "questions.jsonl"
 TARGET_PATH = FB_DIR / "target_doc.txt"
+
+
+def match_docs_by_pathspecs(all_docs: list[str], pathspecs: list[str]) -> list[str]:
+    """Filter doc_names using gitwildmatch/gitignore style pathspecs.
+
+    Args:
+        all_docs: List of candidate document names.
+        pathspecs: List of pathspec patterns (supports ``!`` for exclusion).
+
+    Returns:
+        Filtered and stable list of matching document names.
+    """
+    if not pathspecs:
+        return all_docs
+    spec = pathspec.PathSpec.from_lines("gitwildmatch", pathspecs)
+    matched = [d for d in all_docs if spec.match_file(d)]
+    return matched
 
 
 def load_financebench() -> pd.DataFrame:

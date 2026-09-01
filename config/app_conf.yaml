@@ -193,7 +193,7 @@ cli:
   commands:  # List modules.functions or modules.classes to register CLI commands
     - genai_tk.cli.commands_core.CoreCommands
     - genai_tk.cli.commands_info.InfoCommands
-    - genai_tk.cli.commands_test.TestCommands
+  #  - genai_tk.cli.commands_test.TestCommands
     - genai_tk.workflow.commands.WorkflowCommands
     - genai_tk.workflow.prefect_commands.PrefectCommands
     - genai_tk.extra.commands_extra.ExtraCommands

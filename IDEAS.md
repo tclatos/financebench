@@ -1,12 +1,3 @@
-# cli 
-
-In financebench, we want to  facilitate the benchmark execution and its config.
-- Create a CLI command (as others) that run the benchmark on a set of files given (as currently) in a file.  The LLM as a judge analysys is optional.
-- Follow the usual pattern for the  config; have a YAML file with a list of run configuration - one ot it is selected by the CLI command.  The config contains everything. One list entry  contains current run config (with deepseek flash as LLM, etc) 
-- a new markdownize_profiles has been introduced recently (see /home/tcl/prj/genai-tk/config/markdownize.yaml).  Integrate one of such profile in the run config file (the one corresponfind to current config with Mistral)
-- Change the outcome file structure so its name include the run profile  name
-- Execute the command with current list if processed file and check there's no error
-
 
 
 # Use 

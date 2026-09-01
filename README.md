@@ -10,35 +10,6 @@ database, then a DeepAgent answers financial questions by **navigating** that
 graph with read-only tools (`get_folder_toc`, `get_document_toc`,
 `get_section_content`, `search_sections`) — no embeddings, no vector store.
 
-## Phase 1 result (single document)
-
-Target: `AMD_2022_10K` (auto-selected: the doc with the most questions, 7).
-
-| Accuracy | Groundedness | Numeric match | Avg tool calls |
-|---|---|---|---|
-| **6/7 (85.7%)** | **7/7 (100%)** | 1/2 | 6.4 |
-
-Every answer was grounded in source sections (zero hallucinations). The one
-failure is a numerical-reasoning error (quick-ratio formula), not a retrieval
-failure — see [`report/PHASE1.md`](report/PHASE1.md) for the full diagnostic,
-trajectory analysis, and Phase-2 plan.
-
-## Phase 2 result (multi-document)
-
-Three filings answered corpus-wide (`folder_id=None`): Pfizer 10-Q, BestBuy 10-Q,
-J&J 8-K (3 questions each, all `novel-generated`). File tools restored so the
-skill system works again; new `financial-ratios` skill; config-driven CLI
-(`config/bench.yaml` + `financebench/bench.run`).
-
-| Accuracy | Groundedness | Numeric match | Avg tool calls | Avg in tok/q |
-|---|---|---|---|---|
-| **5/9 (55.6%)** | **7/9 (77.8%)** | 3/5 (60%) | 13.3 | 175,931 |
-
-A sharp regression from Phase 1.3 (85.7% / 100%), concentrated on the two 10-Qs
-(J&J 8-K stayed 3/3). Root cause: the agent stops mapping the document TOC and
-over-searches by keyword — one Pfizer numeric question alone burned 912k input
-tokens (58% of the run). See [`report/PHASE2.md`](report/PHASE2.md) for the
-per-question results, failure analysis, cost diagnosis, and the Phase-3 backlog.
 
 ## Pipeline
 

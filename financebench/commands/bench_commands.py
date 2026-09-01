@@ -53,7 +53,7 @@ class BenchCommands(CliTopCommand):
             table.add_column("Markdownize", style="magenta")
             table.add_column("Agent LLM", style="green")
             table.add_column("Judge LLM", style="blue")
-            table.add_column("Docs Source", style="yellow")
+            table.add_column("Files / Pathspecs", style="yellow")
 
             for name, data in profiles.items():
                 desc = data.get("description", "")
@@ -61,11 +61,16 @@ class BenchCommands(CliTopCommand):
                 llms = data.get("llms", {}) or {}
                 agent_llm = llms.get("agent", "default")
                 judge_llm = llms.get("judge", "default")
-                questions = data.get("questions", {}) or {}
-                docs_file = questions.get("docs_file")
-                docs = questions.get("docs", [])
-                docs_src = f"file: {docs_file}" if docs_file else f"{len(docs)} doc(s)"
-                table.add_row(name, desc, md_prof, agent_llm, judge_llm, docs_src)
+                files = data.get("files", {}) or data.get("questions", {}) or {}
+                pathspecs = files.get("pathspecs", [])
+                docs = files.get("docs", [])
+                if pathspecs:
+                    files_src = f"specs: {', '.join(pathspecs)}"
+                elif docs:
+                    files_src = f"{len(docs)} doc(s)"
+                else:
+                    files_src = "all docs"
+                table.add_row(name, desc, md_prof, agent_llm, judge_llm, files_src)
 
             console.print(table)
 
@@ -79,12 +84,13 @@ class BenchCommands(CliTopCommand):
                     help="Bench run profile key (defaults to default_profile in config)",
                 ),
             ] = None,
-            docs_file: Annotated[
+            pathspecs: Annotated[
                 str | None,
                 typer.Option(
                     "-f",
-                    "--docs-file",
-                    help="Path to file containing document names (comma or newline separated)",
+                    "--files",
+                    "--pathspecs",
+                    help="Comma-separated pathspec patterns to filter documents (e.g. 'BESTBUY*,Pfizer*')",
                 ),
             ] = None,
             docs: Annotated[
@@ -92,7 +98,7 @@ class BenchCommands(CliTopCommand):
                 typer.Option(
                     "-d",
                     "--docs",
-                    help="Comma-separated doc_names overriding config questions.docs",
+                    help="Comma-separated doc_names overriding config files.docs",
                 ),
             ] = None,
             judge: Annotated[
@@ -131,9 +137,9 @@ class BenchCommands(CliTopCommand):
 
             Examples:
                 cli bench run
-                cli bench run -p deepseek_flash -n 3
+                cli bench run -p mistral_glm -n 3
                 cli bench run --no-judge
-                cli bench run -f data/financebench/target_doc.txt
+                cli bench run -f 'BESTBUY*,Pfizer*'
                 cli bench run --skip fetch --skip build
                 cli bench run --step run -n 1
             """
@@ -160,8 +166,9 @@ class BenchCommands(CliTopCommand):
 
             if docs:
                 cfg.docs = [d.strip() for d in docs.split(",") if d.strip()]
-            elif docs_file:
-                cfg.docs = cfg.resolve_docs(docs_file_override=docs_file)
+            elif pathspecs:
+                specs_list = [s.strip() for s in pathspecs.split(",") if s.strip()]
+                cfg.docs = cfg.resolve_docs(pathspecs_override=specs_list)
 
             if limit is not None:
                 cfg.limit = limit

@@ -24,10 +24,11 @@ import json
 import sys
 from pathlib import Path
 
-import yaml
 from loguru import logger
-from pydantic import BaseModel
+from omegaconf import OmegaConf
+from pydantic import BaseModel, Field
 
+from genai_tk.config_mgmt.config_mngr import global_config
 from financebench.bench._env import PROJECT_ROOT, ensure_dirs, load_env
 
 ALL_STEPS = ("fetch", "build", "run", "grade")
@@ -36,7 +37,7 @@ ALL_STEPS = ("fetch", "build", "run", "grade")
 class BenchConfig(BaseModel):
     """Flat bench config loaded from a named YAML profile; paths resolved to absolute."""
 
-    profile_name: str = "deepseek_flash"
+    profile_name: str = "mistral_glm"
     description: str = ""
     markdownize_profile: str = "medium"
     pdfs_dir: str = "data/pdfs"
@@ -46,9 +47,9 @@ class BenchConfig(BaseModel):
     runs: str = "data/financebench/{profile}/runs.jsonl"
     scores: str = "data/financebench/{profile}/scores.jsonl"
     scores_summary: str = "data/financebench/{profile}/scores_summary.json"
-    agent_llm: str = "deepseek_v4flash@openrouter"
-    build_llm: str = "deepseek_v4flash@openrouter"
-    judge_llm: str = "deepseek_v4flash@openrouter"
+    agent_llm: str = "glm_5.2@openrouter"
+    build_llm: str = "deepseek-v4-flash-0731@openrouter"
+    judge_llm: str = "DeepSeek-V4-Pro-0813@openrouter"
     skip_ocr: bool = False
     build_force: bool = True
     build_llm_enabled: bool = True
@@ -58,8 +59,8 @@ class BenchConfig(BaseModel):
     embeddings: str | None = None
     fts: bool = True
     chunk_size_tokens: int = 1500
-    docs_file: str | None = None
-    docs: list[str] = []
+    pathspecs: list[str] = Field(default_factory=list)
+    docs: list[str] = Field(default_factory=list)
     limit: int | None = None
     agent_profile: str = "default"
     folder_id: str | None = None
@@ -86,45 +87,53 @@ class BenchConfig(BaseModel):
         self.runs = _abs(self.runs)
         self.scores = _abs(self.scores)
         self.scores_summary = _abs(self.scores_summary)
-        if self.docs_file:
-            self.docs_file = _abs(self.docs_file)
 
     def resolve_docs(
         self,
         *,
         docs_override: list[str] | None = None,
-        docs_file_override: str | Path | None = None,
+        pathspecs_override: list[str] | None = None,
     ) -> list[str]:
-        """Resolve document names from explicit overrides, a docs file, or config list."""
+        """Resolve document names from explicit overrides, pathspecs against available dataset docs, or config."""
         if docs_override:
             return docs_override
-        file_to_read = docs_file_override or self.docs_file
-        if file_to_read:
-            p = Path(file_to_read).expanduser()
-            if not p.is_absolute():
-                p = PROJECT_ROOT / p
-            if p.exists():
-                text = p.read_text(encoding="utf-8").strip()
-                items: list[str] = []
-                for line in text.splitlines():
-                    for item in line.split(","):
-                        val = item.strip()
-                        if val and val not in items:
-                            items.append(val)
-                if items:
-                    return items
+
+        from financebench.bench.load_dataset import load_financebench, match_docs_by_pathspecs
+
+        active_pathspecs = pathspecs_override or self.pathspecs
+        if active_pathspecs:
+            try:
+                df = load_financebench()
+                all_docs = sorted(df["doc_name"].dropna().unique().tolist())
+                matched = match_docs_by_pathspecs(all_docs, active_pathspecs)
+                if matched:
+                    return matched
+            except Exception as exc:
+                logger.warning("Could not filter dataset by pathspecs ({}): {}", active_pathspecs, exc)
+
         return self.docs
+
+
+def _get_raw_bench_conf(config_path: Path | None = None) -> dict:
+    """Load bench.yaml with OmegaConf interpolation."""
+    cfg_file = config_path or (PROJECT_ROOT / "config" / "bench.yaml")
+    if not cfg_file.exists():
+        return {}
+    try:
+        # Use genai-tk global_config if available so ${paths.*} interpolate
+        root_conf = global_config().root
+        loaded = OmegaConf.load(cfg_file)
+        merged = OmegaConf.merge(root_conf, loaded)
+        return OmegaConf.to_container(merged, resolve=True) or {}
+    except Exception:
+        loaded = OmegaConf.load(cfg_file)
+        return OmegaConf.to_container(loaded, resolve=True) or {}
 
 
 def list_bench_profiles(config_path: Path | None = None) -> dict[str, dict]:
     """Return all available bench profiles in the config file."""
-    cfg_file = config_path or (PROJECT_ROOT / "config" / "bench.yaml")
-    if not cfg_file.exists():
-        return {}
-    raw = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    raw = _get_raw_bench_conf(config_path)
     profiles = raw.get("bench_profiles", {})
-    if not profiles and "paths" in raw:
-        return {"default": raw}
     return profiles
 
 
@@ -136,15 +145,13 @@ def load_bench_profile(
     cfg_file = config_path or (PROJECT_ROOT / "config" / "bench.yaml")
     if not cfg_file.exists():
         raise FileNotFoundError(f"Config file not found: {cfg_file}")
-    raw = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+
+    raw = _get_raw_bench_conf(config_path)
     profiles = raw.get("bench_profiles", {})
-    default_name = raw.get("default_profile", "deepseek_flash")
+    default_name = raw.get("default_profile", "mistral_glm")
 
     selected_name = profile_name or default_name
-    if not profiles and "paths" in raw:
-        prof_data = raw
-        selected_name = profile_name or "default"
-    elif selected_name in profiles:
+    if selected_name in profiles:
         prof_data = profiles[selected_name] or {}
     else:
         available = list(profiles.keys())
@@ -152,12 +159,20 @@ def load_bench_profile(
             f"Bench profile '{selected_name}' not found in {cfg_file}. Available: {available}"
         )
 
-    paths = prof_data.get("paths", {}) or {}
+    # Top-level paths with per-profile override support
+    top_paths = raw.get("paths", {}) or {}
+    prof_paths = prof_data.get("paths", {}) or {}
+    paths = {**top_paths, **prof_paths}
+
     llms = prof_data.get("llms", {}) or {}
     build = prof_data.get("build", {}) or {}
-    questions = prof_data.get("questions", {}) or {}
+    files = prof_data.get("files", {}) or prof_data.get("questions", {}) or {}
     agent = prof_data.get("agent", {}) or {}
     judge = prof_data.get("judge", {}) or {}
+
+    pathspecs = files.get("pathspecs", [])
+    if isinstance(pathspecs, str):
+        pathspecs = [pathspecs]
 
     cfg = BenchConfig(
         profile_name=selected_name,
@@ -174,9 +189,9 @@ def load_bench_profile(
         scores_summary=paths.get(
             "scores_summary", "data/financebench/{profile}/scores_summary.json"
         ),
-        agent_llm=llms.get("agent", "deepseek_v4flash@openrouter"),
-        build_llm=llms.get("build", "deepseek_v4flash@openrouter"),
-        judge_llm=llms.get("judge", "deepseek_v4flash@openrouter"),
+        agent_llm=llms.get("agent", "glm_5.2@openrouter"),
+        build_llm=llms.get("build", "deepseek-v4-flash-0731@openrouter"),
+        judge_llm=llms.get("judge", "DeepSeek-V4-Pro-0813@openrouter"),
         skip_ocr=bool(build.get("skip_ocr", False)),
         build_force=bool(build.get("force", True)),
         build_llm_enabled=bool(build.get("llm", True)),
@@ -186,9 +201,9 @@ def load_bench_profile(
         embeddings=build.get("embeddings"),
         fts=bool(build.get("fts", True)),
         chunk_size_tokens=int(build.get("chunk_size_tokens", 1500)),
-        docs_file=questions.get("docs_file"),
-        docs=list(questions.get("docs", []) or []),
-        limit=questions.get("limit"),
+        pathspecs=list(pathspecs),
+        docs=list(files.get("docs", []) or []),
+        limit=files.get("limit"),
         agent_profile=agent.get("profile", "default"),
         folder_id=agent.get("folder_id"),
         judge_enabled=bool(judge.get("enabled", True)),

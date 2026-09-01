@@ -78,7 +78,6 @@ def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
     """Return the Markdown text for *pdf_path* via the configured markdownize profile (e.g. mistral_ocr)."""
     from genai_tk.extra.markdownize.factory import ConverterFactory
     from genai_tk.workflow.markdownize.config import get_markdownize_profile
-    from genai_tk.workflow.markdownize.converters import _markitdown_text
 
     try:
         prof = get_markdownize_profile(markdownize_profile)
@@ -111,7 +110,8 @@ def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
             exc,
             pdf_path.name,
         )
-    return _markitdown_text(pdf_path)
+    fallback_converter = ConverterFactory.create("markitdown")
+    return asyncio.run(fallback_converter.convert(pdf_path))
 
 
 def _ocr_pdf(pdf_path: Path) -> str:
@@ -250,7 +250,7 @@ def build_document_graph(
     backend.connect(str(db_path))
     try:
         if force:
-            logger.info("Dropping existing Document Graph tables at {}", KG_DB)
+            logger.info("Dropping existing Document Graph tables at {}", db_path)
             drop_document_graph(backend)
         factory = DocumentGraphFactory(
             sources=[str(md_base)],

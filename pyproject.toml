@@ -1,7 +1,7 @@
 [project]
 name = "financebench"
 version = "0.1.0"
-description = "Add your description here"
+description = "Benchmarking a Document Graph + agentic search stack on[FinanceBench]"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -22,15 +22,11 @@ genai_graph = { path = "../genai-graph", editable = true }
 package = true
 
 
-# Forward genai-tk optional extras — install with: uv sync --extra <name>
+# Forward some of genai-tk's optional extras — install with: uv sync --extra <name>
 [project.optional-dependencies]
 harnessing = ["genai-tk[harnessing]"]
-browser    = ["genai-tk[browser]"]
 nlp        = ["genai-tk[nlp]"]
-postgres   = ["genai-tk[postgres]"]
-streamlit  = ["genai-tk[streamlit]"]
-baml       = ["genai-tk[baml]", "baml-py"]  # baml-py must be direct to expose baml-cli binary
-chromadb   = ["genai-tk[chromadb]"]
+
 
 [build-system]
 requires = ["hatchling"]
