@@ -19,8 +19,6 @@ uv run cli bench run --step run --limit 1
 from __future__ import annotations
 
 import argparse
-import asyncio
-import json
 import sys
 from pathlib import Path
 

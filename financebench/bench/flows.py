@@ -22,7 +22,6 @@ from typing import Any
 
 from loguru import logger
 from prefect import flow, task
-from prefect.task_runners import ThreadPoolTaskRunner
 
 from financebench.bench._env import ensure_dirs, load_env
 from financebench.bench.run import BenchConfig

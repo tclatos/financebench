@@ -1,24 +1,5 @@
 
 
-# better genai-graph
-
-- Update in genai-graph  the  cli docgraph commands so that they  take into account the new feature related to chunks
-
-- Use Chonkie instead of genai_graph/kg/document_graph/chunker.py 
-
-- Have a YAML file to define how the doc graph is build. Reuse the build part of /home/tcl/prj/financebench/config/bench.yaml. Define several configs (fulln withour embeddings, ...) and a default one as a YAML alias.
-
-- more tests, notably semantic  search. Create test graph in memory ;   Use real LLM
-
-- update doc and skills
-
-
-# better financebench
-- leverage the changes in genai-graph
-
-
-Update doc 
-
 # Review 
 
 Review the first iterations to achieve good results at FinanceBench. I want to get your view before trying with stronger LLM, and continuing evaluation with more files from the benchmark.
@@ -33,10 +14,8 @@ Is  there other reason than using stronger LLM ?
 
 I also wonder why the search tool is so used. Is the table of content not enough informative (could we improve the process to pass from Markdow doc to sections ? the summaries ? ) ? or the skill not providing correct approach  ? 
 
-I also think that reading financial_kb.json from a skill is useless - we could but the knowledge inside the skill in markdown. 
 Clearly,  skills can be improved.
 
-The CLi command tu run the test could be in Python rather than in just, to more compliant with other commmands
 
 Also there has been many changes in the code. Have a look at it and see if it could be simplified, made more generic etc. 
 (I want notably to test later our approach with the OfficeQA Pro benchmark. )
@@ -45,22 +24,10 @@ Also there has been many changes in the code. Have a look at it and see if it co
 
 
 
-
-
-
-
-
-
-
-
-
-
 - need better 'docgraph cat' commmand -> section range, section separator 
 
-- There' other financial doc than 10K and 100 K  : EArnings, Annual Report, 8K, 10Q, 
-    -> Update skills
-
-- No summaries -   cli docgraph toc f391da52bf0af1c2 --yaml 
+- There are other financial docs than 10-K: Earnings Releases, Annual Reports, 8-K, 10-Q, 20-F/6-K
+    -> Update skills & system prompt [DONE: expanded financebench-qa skill and agents.yaml system prompt with filing-type routing, 8-K exhibits, 10-Q quarter vs YTD, notes drilldown, and trajectory insights]
     Does that has an impact ? Measure it
 
 - Summaries or embeddings of section ? 
