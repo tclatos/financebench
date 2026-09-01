@@ -1,19 +1,70 @@
-Let's continue now with other some files from the benchnmark. 
+# cli 
 
-1 /  implement a CLI interface to test easily other files; Introduce a YAML file to configure  common parameters, such as folders, the different LLM used (for the agent, for the summary and for the judge), etc. 
+In financebench, we want to  facilitate the benchmark execution and its config.
+- Create a CLI command (as others) that run the benchmark on a set of files given (as currently) in a file.  The LLM as a judge analysys is optional.
+- Follow the usual pattern for the  config; have a YAML file with a list of run configuration - one ot it is selected by the CLI command.  The config contains everything. One list entry  contains current run config (with deepseek flash as LLM, etc) 
+- a new markdownize_profiles has been introduced recently (see /home/tcl/prj/genai-tk/config/markdownize.yaml).  Integrate one of such profile in the run config file (the one corresponfind to current config with Mistral)
+- Change the outcome file structure so its name include the run profile  name
+- Execute the command with current list if processed file and check there's no error
 
-2/ Re-enable the read-file tool because we need the skill system 
 
-3/ The project NanoIndex  achieve very good results on financebench, with a similar approach as our. One reason I guess is that they provide financial knowledge. So let create a finance skills. We could reused they knowledge compilation :  https://github.com/NanoNets/nanoindex/blob/main/nanoindex/knowledge/financial_kb.json  
 
-4/ More generally, review the skills. The one on genai-graph should be quite generic, and mention to not use available read-file tools (grep, ...). 
-The skills in the benchmark can include finance knowledge (possibly as reference, or in another skill - you choose ). 
+# Use 
+ - latest deepseek-v4-flash-7XXX
+ - GLM 5.2 (as Mistral memo)
 
-4/ Mafin2.5 also used a similar approach. They evaluation is criteria are worth considering in introduces in our judge  :  https://github.com/VectifyAI/Mafin2.5-FinanceBench/blob/main/eval.py 
 
-5/ Run the agent on 3 other files you select  (with many questions, different that 10K, ... ), and update the report or create a new one.
 
-Think, Think, propose a plan, ask questions, suggest alternatives, ...
+# better genai-graph
+
+- Update in genai-graph  the  cli docgraph commands so that they  take into account the new feature related to chunks
+
+- Use Chonkie instead of genai_graph/kg/document_graph/chunker.py 
+
+- Have a YAML file to define how the doc graph is build. Reuse the build part of /home/tcl/prj/financebench/config/bench.yaml. Define several configs (fulln withour embeddings, ...) and a default one as a YAML alias.
+
+- more tests, notably semantic  search. Create test graph in memory ;   Use real LLM
+
+- update doc and skills
+
+
+# better financebench
+- leverage the changes in genai-graph
+
+
+Update doc 
+
+# Review 
+
+Review the first iterations to achieve good results at FinanceBench. I want to get your view before trying with stronger LLM, and continuing evaluation with more files from the benchmark.
+- Analyse the reports here  : /home/tcl/prj/financebench/report
+- Analyse directly the recorded trajectories: /home/tcl/prj/financebench/data/trajectories 
+- Analyse code and skills (genai-graph and financebech) 
+Make your own critical analysis of what has been done, and what could be improved.
+Progress has notably been done when moving away from a pure solution without embeddings. It's not a major concern because I'm not a purist and having embeddings does not impact design too much and could be useful anyway, but I would like to understand how other solutions claim very good results with just doc tree:   
+- https://github.com/NanoNets/nanoindex/ 
+- https://github.com/VectifyAI/Mafin2.5-FinanceBench  (based on https://github.com/VectifyAI/PageIndex).  
+Is  there other reason than using stronger LLM ? 
+
+I also wonder why the search tool is so used. Is the table of content not enough informative (could we improve the process to pass from Markdow doc to sections ? the summaries ? ) ? or the skill not providing correct approach  ? 
+
+I also think that reading financial_kb.json from a skill is useless - we could but the knowledge inside the skill in markdown. 
+Clearly,  skills can be improved.
+
+The CLi command tu run the test could be in Python rather than in just, to more compliant with other commmands
+
+Also there has been many changes in the code. Have a look at it and see if it could be simplified, made more generic etc. 
+(I want notably to test later our approach with the OfficeQA Pro benchmark. )
+
+
+
+
+
+
+
+
+
+
 
 
 

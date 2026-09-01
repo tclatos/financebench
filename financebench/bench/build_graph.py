@@ -22,9 +22,9 @@ depend on a Prefect server.
 
 Usage:
 ```bash
-uv run python -m financebench.bench.build_graph
-uv run python -m financebench.bench.build_graph --doc AMD_2022_10K --force
-uv run python -m financebench.bench.build_graph --skip-ocr --force --llm
+uv run cli bench run --step build
+uv run cli bench run --step build --force
+uv run cli bench run --step build -p deepseek_flash
 ```
 """
 
@@ -74,28 +74,49 @@ def _resolve_build_llm(llm: str | None) -> str | None:
     return cfg.get_str("kg_build.llms.default", default=None)
 
 
-def _ocr_pdf(pdf_path: Path) -> str:
-    """Return the Markdown text for *pdf_path* via Mistral OCR (markitdown fallback)."""
+def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
+    """Return the Markdown text for *pdf_path* via the configured markdownize profile (e.g. mistral_ocr)."""
+    from genai_tk.extra.markdownize.factory import ConverterFactory
+    from genai_tk.workflow.markdownize.config import get_markdownize_profile
     from genai_tk.workflow.markdownize.converters import _markitdown_text
-    from genai_tk.workflow.markdownize.mistral import MistralOCRBatchProcessor
 
     try:
-        texts = asyncio.run(MistralOCRBatchProcessor().process_batch([pdf_path]))
-        text = texts.get(str(pdf_path))
+        prof = get_markdownize_profile(markdownize_profile)
+        converter_name = prof.select_route(pdf_path)
+    except Exception as exc:
+        logger.warning(
+            "Failed to resolve markdownize profile '{}': {}; defaulting to mistral_ocr.",
+            markdownize_profile,
+            exc,
+        )
+        converter_name = "mistral_ocr"
+
+    try:
+        converter = ConverterFactory.create(converter_name)
+        text = asyncio.run(converter.convert(pdf_path))
         if text:
-            logger.success("Mistral OCR completed for {}", pdf_path.name)
+            logger.success(
+                "{} conversion completed for {}", converter_name, pdf_path.name
+            )
             return text
         logger.warning(
-            "Mistral OCR returned no text for {}; using markitdown fallback.",
+            "Converter {} returned no text for {}; using markitdown fallback.",
+            converter_name,
             pdf_path.name,
         )
     except Exception as exc:  # noqa: BLE101
         logger.warning(
-            "Mistral batch OCR failed ({}); falling back to markitdown for {}.",
+            "Conversion with {} failed ({}); falling back to markitdown for {}.",
+            converter_name,
             exc,
             pdf_path.name,
         )
     return _markitdown_text(pdf_path)
+
+
+def _ocr_pdf(pdf_path: Path) -> str:
+    """Backward-compatible wrapper for :func:`_convert_pdf` with medium profile."""
+    return _convert_pdf(pdf_path, markdownize_profile="medium")
 
 
 def markdownize_target(
@@ -104,6 +125,7 @@ def markdownize_target(
     force: bool,
     pdfs_dir: Path | None = None,
     onedrive_markdown_dir: Path | None = None,
+    markdownize_profile: str = "medium",
 ) -> Path:
     """OCR the target PDF to the OneDrive mirror and return the produced .md path.
 
@@ -128,8 +150,13 @@ def markdownize_target(
         logger.info("Markdown already present (use --force to re-OCR): {}", md_path)
         return md_path
 
-    logger.info("OCR-ing {} via Mistral OCR → {}", pdf_path, md_path)
-    text = _ocr_pdf(pdf_path)
+    logger.info(
+        "Converting {} via markdownize profile '{}' → {}",
+        pdf_path,
+        markdownize_profile,
+        md_path,
+    )
+    text = _convert_pdf(pdf_path, markdownize_profile=markdownize_profile)
     _write_markdown(md_path, pdf_path, text)
     logger.success(
         "OCR markdown written: {} ({} bytes)", md_path, md_path.stat().st_size
@@ -191,9 +218,7 @@ def build_document_graph(
     db_path = kg_db or KG_DB
     md_files = list(md_base.glob("*.md"))
     if not md_files:
-        raise SystemExit(
-            f"No markdown found in {md_base} — run markdownize first."
-        )
+        raise SystemExit(f"No markdown found in {md_base} — run markdownize first.")
 
     resolved_llm = _resolve_build_llm(llm)
     outline_config: OutlineConfig | None = None

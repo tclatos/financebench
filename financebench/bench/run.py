@@ -8,10 +8,11 @@ run_questions, grade).
 
 Usage:
 ```bash
-uv run python -m financebench.bench.run
-uv run python -m financebench.bench.run --config config/bench.yaml
-uv run python -m financebench.bench.run --docs A,B --skip fetch
-uv run python -m financebench.bench.run --step run --limit 1
+uv run cli bench run
+uv run cli bench run --profile deepseek_flash
+uv run cli bench run --docs-file data/financebench/target_doc.txt
+uv run cli bench run --docs A,B --skip fetch
+uv run cli bench run --step run --limit 1
 ```
 """
 
@@ -33,14 +34,18 @@ ALL_STEPS = ("fetch", "build", "run", "grade")
 
 
 class BenchConfig(BaseModel):
-    """Flat bench config loaded from YAML; paths resolved to absolute."""
+    """Flat bench config loaded from a named YAML profile; paths resolved to absolute."""
 
+    profile_name: str = "deepseek_flash"
+    description: str = ""
+    markdownize_profile: str = "medium"
     pdfs_dir: str = "data/pdfs"
     markdown_dir: str = "data/markdown_multi"
     kg_db: str = "data/kg/financebench_multi.db"
     onedrive_markdown_dir: str = "~/OneDrive/prj/financebench/markdown"
-    runs: str = "data/financebench/runs.jsonl"
-    scores: str = "data/financebench/scores.jsonl"
+    runs: str = "data/financebench/{profile}/runs.jsonl"
+    scores: str = "data/financebench/{profile}/scores.jsonl"
+    scores_summary: str = "data/financebench/{profile}/scores_summary.json"
     agent_llm: str = "deepseek_v4flash@openrouter"
     build_llm: str = "deepseek_v4flash@openrouter"
     judge_llm: str = "deepseek_v4flash@openrouter"
@@ -53,13 +58,22 @@ class BenchConfig(BaseModel):
     embeddings: str | None = None
     fts: bool = True
     chunk_size_tokens: int = 1500
+    docs_file: str | None = None
     docs: list[str] = []
     limit: int | None = None
-    agent_profile: str = "docgraph"
+    agent_profile: str = "default"
     folder_id: str | None = None
+    judge_enabled: bool = True
 
     def model_post_init(self, __context) -> None:
-        """Expand ``~`` and resolve project-relative paths to absolute."""
+        """Expand ``~``, interpolate ``{profile}``, and resolve project-relative paths to absolute."""
+
+        def _interpolate(p: str) -> str:
+            return p.format(profile=self.profile_name)
+
+        self.runs = _interpolate(self.runs)
+        self.scores = _interpolate(self.scores)
+        self.scores_summary = _interpolate(self.scores_summary)
 
         def _abs(p: str) -> str:
             path = Path(p).expanduser()
@@ -71,25 +85,95 @@ class BenchConfig(BaseModel):
         self.onedrive_markdown_dir = _abs(self.onedrive_markdown_dir)
         self.runs = _abs(self.runs)
         self.scores = _abs(self.scores)
+        self.scores_summary = _abs(self.scores_summary)
+        if self.docs_file:
+            self.docs_file = _abs(self.docs_file)
+
+    def resolve_docs(
+        self,
+        *,
+        docs_override: list[str] | None = None,
+        docs_file_override: str | Path | None = None,
+    ) -> list[str]:
+        """Resolve document names from explicit overrides, a docs file, or config list."""
+        if docs_override:
+            return docs_override
+        file_to_read = docs_file_override or self.docs_file
+        if file_to_read:
+            p = Path(file_to_read).expanduser()
+            if not p.is_absolute():
+                p = PROJECT_ROOT / p
+            if p.exists():
+                text = p.read_text(encoding="utf-8").strip()
+                items: list[str] = []
+                for line in text.splitlines():
+                    for item in line.split(","):
+                        val = item.strip()
+                        if val and val not in items:
+                            items.append(val)
+                if items:
+                    return items
+        return self.docs
 
 
-def _load_config(path: Path) -> BenchConfig:
-    """Load the nested bench YAML into a flat :class:`BenchConfig`."""
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    paths = raw.get("paths", {}) or {}
-    llms = raw.get("llms", {}) or {}
-    build = raw.get("build", {}) or {}
-    questions = raw.get("questions", {}) or {}
-    agent = raw.get("agent", {}) or {}
-    return BenchConfig(
+def list_bench_profiles(config_path: Path | None = None) -> dict[str, dict]:
+    """Return all available bench profiles in the config file."""
+    cfg_file = config_path or (PROJECT_ROOT / "config" / "bench.yaml")
+    if not cfg_file.exists():
+        return {}
+    raw = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    profiles = raw.get("bench_profiles", {})
+    if not profiles and "paths" in raw:
+        return {"default": raw}
+    return profiles
+
+
+def load_bench_profile(
+    profile_name: str | None = None,
+    config_path: Path | None = None,
+) -> BenchConfig:
+    """Load a named bench profile into a :class:`BenchConfig`."""
+    cfg_file = config_path or (PROJECT_ROOT / "config" / "bench.yaml")
+    if not cfg_file.exists():
+        raise FileNotFoundError(f"Config file not found: {cfg_file}")
+    raw = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    profiles = raw.get("bench_profiles", {})
+    default_name = raw.get("default_profile", "deepseek_flash")
+
+    selected_name = profile_name or default_name
+    if not profiles and "paths" in raw:
+        prof_data = raw
+        selected_name = profile_name or "default"
+    elif selected_name in profiles:
+        prof_data = profiles[selected_name] or {}
+    else:
+        available = list(profiles.keys())
+        raise KeyError(
+            f"Bench profile '{selected_name}' not found in {cfg_file}. Available: {available}"
+        )
+
+    paths = prof_data.get("paths", {}) or {}
+    llms = prof_data.get("llms", {}) or {}
+    build = prof_data.get("build", {}) or {}
+    questions = prof_data.get("questions", {}) or {}
+    agent = prof_data.get("agent", {}) or {}
+    judge = prof_data.get("judge", {}) or {}
+
+    cfg = BenchConfig(
+        profile_name=selected_name,
+        description=prof_data.get("description", ""),
+        markdownize_profile=prof_data.get("markdownize_profile", "medium"),
         pdfs_dir=paths.get("pdfs_dir", "data/pdfs"),
         markdown_dir=paths.get("markdown_dir", "data/markdown_multi"),
         kg_db=paths.get("kg_db", "data/kg/financebench_multi.db"),
         onedrive_markdown_dir=paths.get(
             "onedrive_markdown_dir", "~/OneDrive/prj/financebench/markdown"
         ),
-        runs=paths.get("runs", "data/financebench/runs.jsonl"),
-        scores=paths.get("scores", "data/financebench/scores.jsonl"),
+        runs=paths.get("runs", "data/financebench/{profile}/runs.jsonl"),
+        scores=paths.get("scores", "data/financebench/{profile}/scores.jsonl"),
+        scores_summary=paths.get(
+            "scores_summary", "data/financebench/{profile}/scores_summary.json"
+        ),
         agent_llm=llms.get("agent", "deepseek_v4flash@openrouter"),
         build_llm=llms.get("build", "deepseek_v4flash@openrouter"),
         judge_llm=llms.get("judge", "deepseek_v4flash@openrouter"),
@@ -102,11 +186,15 @@ def _load_config(path: Path) -> BenchConfig:
         embeddings=build.get("embeddings"),
         fts=bool(build.get("fts", True)),
         chunk_size_tokens=int(build.get("chunk_size_tokens", 1500)),
+        docs_file=questions.get("docs_file"),
         docs=list(questions.get("docs", []) or []),
         limit=questions.get("limit"),
-        agent_profile=agent.get("profile", "docgraph"),
+        agent_profile=agent.get("profile", "default"),
         folder_id=agent.get("folder_id"),
+        judge_enabled=bool(judge.get("enabled", True)),
     )
+    cfg.docs = cfg.resolve_docs()
+    return cfg
 
 
 def _step_fetch(cfg: BenchConfig) -> None:
@@ -144,6 +232,7 @@ def _step_build(cfg: BenchConfig) -> None:
                 force=cfg.build_force,
                 pdfs_dir=pdfs,
                 onedrive_markdown_dir=onedrive,
+                markdownize_profile=cfg.markdownize_profile,
             )
         copy_markdown_to_project(md_path, markdown_dir=md_dir)
 
@@ -212,6 +301,9 @@ def _step_grade(cfg: BenchConfig) -> None:
 
     runs_path = Path(cfg.runs)
     scores_path = Path(cfg.scores)
+    if not runs_path.exists():
+        logger.warning("Runs file does not exist: {}. Skipping grade.", runs_path)
+        return
     runs = [
         json.loads(line)
         for line in runs_path.read_text(encoding="utf-8").splitlines()
@@ -222,10 +314,54 @@ def _step_grade(cfg: BenchConfig) -> None:
     logger.info("Grading {} run(s) with judge={}", len(runs), cfg.judge_llm)
     scores = asyncio.run(_grade_all(runs, cfg.judge_llm, scores_path=scores_path))
     summary = _summarize(scores)
-    summary_path = scores_path.parent / "scores_summary.json"
+    summary_path = Path(cfg.scores_summary)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"scores={scores_path}")
     print(f"summary={json.dumps(summary)}")
+
+
+def run_bench(
+    cfg: BenchConfig,
+    *,
+    steps: list[str] | None = None,
+    skip: list[str] | None = None,
+    step: str | None = None,
+) -> None:
+    """Execute the benchmark pipeline stages for *cfg*."""
+    load_env()
+    ensure_dirs()
+
+    if not cfg.docs:
+        raise SystemExit(
+            "No docs configured (set questions.docs or questions.docs_file in config, or pass --docs/--docs-file)."
+        )
+
+    if step:
+        selected_steps = [step]
+    elif steps:
+        selected_steps = steps
+    else:
+        skip_set = set(skip or [])
+        if not cfg.judge_enabled:
+            skip_set.add("grade")
+        selected_steps = [s for s in ALL_STEPS if s not in skip_set]
+
+    logger.info(
+        "Bench profile '{}' | Steps: {} | docs: {}",
+        cfg.profile_name,
+        selected_steps,
+        cfg.docs,
+    )
+    for s in selected_steps:
+        if s == "fetch":
+            _step_fetch(cfg)
+        elif s == "build":
+            _step_build(cfg)
+        elif s == "run":
+            _step_run(cfg)
+        elif s == "grade":
+            _step_grade(cfg)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -237,6 +373,18 @@ def main(argv: list[str] | None = None) -> int:
         "--config",
         default=str(PROJECT_ROOT / "config" / "bench.yaml"),
         help="Path to the bench YAML config.",
+    )
+    parser.add_argument(
+        "-p",
+        "--profile",
+        default=None,
+        help="Named bench profile to run (defaults to default_profile in config).",
+    )
+    parser.add_argument(
+        "-f",
+        "--docs-file",
+        default=None,
+        help="Path to file containing document names.",
     )
     parser.add_argument(
         "--docs",
@@ -262,31 +410,25 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Run only the first N questions.",
     )
+    parser.add_argument(
+        "--judge",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable LLM-as-judge evaluation step.",
+    )
     args = parser.parse_args(argv)
 
-    load_env()
-    ensure_dirs()
-    cfg = _load_config(Path(args.config))
+    cfg = load_bench_profile(profile_name=args.profile, config_path=Path(args.config))
     if args.docs:
         cfg.docs = [d.strip() for d in args.docs.split(",") if d.strip()]
+    elif args.docs_file:
+        cfg.docs = cfg.resolve_docs(docs_file_override=args.docs_file)
     if args.limit is not None:
         cfg.limit = args.limit
-    if not cfg.docs:
-        raise SystemExit(
-            "No docs configured (set questions.docs in the config or pass --docs)."
-        )
+    if args.judge is not None:
+        cfg.judge_enabled = args.judge
 
-    steps = [args.step] if args.step else [s for s in ALL_STEPS if s not in args.skip]
-    logger.info("Steps: {} | docs: {}", steps, cfg.docs)
-    for step in steps:
-        if step == "fetch":
-            _step_fetch(cfg)
-        elif step == "build":
-            _step_build(cfg)
-        elif step == "run":
-            _step_run(cfg)
-        elif step == "grade":
-            _step_grade(cfg)
+    run_bench(cfg, skip=args.skip, step=args.step)
     return 0
 
 

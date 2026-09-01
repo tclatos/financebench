@@ -198,6 +198,8 @@ cli:
     - genai_tk.workflow.prefect_commands.PrefectCommands
     - genai_tk.extra.commands_extra.ExtraCommands
     - genai_tk.agents.commands_agents.AgentCommands
+    - financebench.commands.agent_commands.AgentCommands
+    - financebench.commands.bench_commands.BenchCommands
   #  - genai_tk.agents.sandbox.cli_commands.SandboxCommands
   #  - genai_tk.extra.structured.commands_baml.BamlCommands
   #  - genai_tk.workflow.rag.commands_rag.RagCommands

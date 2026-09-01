@@ -1,37 +1,128 @@
-# FinanceBench evaluation config, consumed by `python -m financebench.bench.run`.
-# Paths are relative to the project root unless absolute. `~` is expanded.
+# FinanceBench evaluation configurations and document conversion settings.
+# Select active profile via CLI `--profile <name>` (defaults to `default_profile`).
+# Outcome paths support `{profile}` substitution to write under a profile-specific directory.
 
-paths:
-  pdfs_dir: data/pdfs
-  markdown_dir: data/markdown_multi
-  kg_db: data/kg/financebench_multi.db
-  onedrive_markdown_dir: ~/OneDrive/prj/financebench/markdown
-  runs: data/financebench/runs.jsonl
-  scores: data/financebench/scores.jsonl
+default_profile: deepseek_flash
 
-llms:
-  agent: deepseek_v4flash@openrouter
-  build: deepseek_v4flash@openrouter
-  judge: deepseek_v4flash@openrouter
+bench_profiles:
+  deepseek_flash:
+    description: "DeepSeek v4 Flash run with Mistral OCR (medium profile) and hybrid Document Graph search"
+    markdownize_profile: medium
+    paths:
+      pdfs_dir: data/pdfs
+      markdown_dir: data/markdown_multi
+      kg_db: data/kg/financebench_multi.db
+      onedrive_markdown_dir: ~/OneDrive/prj/financebench/markdown
+      runs: data/financebench/{profile}/runs.jsonl
+      scores: data/financebench/{profile}/scores.jsonl
+      scores_summary: data/financebench/{profile}/scores_summary.json
 
-build:
-  skip_ocr: false
-  force: true
-  llm: true              # true = LLM-enhanced outline build; false = algorithmic
-  workers: 4
-  summary_min_tokens: 800
-  context_safety_ratio: 0.9
-  embeddings: qwen3_06b@deepinfra  # SectionChunk vector model (null = no vector leg, keyword-only search)
-  fts: true                       # native BM25/FTS index over MarkdownSection(title, text, description)
-  chunk_size_tokens: 1500         # target chunk size for long sections
+    llms:
+      agent: deepseek_v4flash@openrouter
+      build: deepseek_v4flash@openrouter
+      judge: deepseek_v4flash@openrouter
 
-questions:
-  docs:
-    - BESTBUY_2024Q2_10Q
-    - Pfizer_2023Q2_10Q
-    - JOHNSON_JOHNSON_2023_8K_dated-2023-08-30
-  limit: null
+    build:
+      skip_ocr: false
+      force: true
+      llm: true              # true = LLM-enhanced outline build; false = algorithmic
+      workers: 4
+      summary_min_tokens: 800
+      context_safety_ratio: 0.9
+      embeddings: qwen3_06b@deepinfra  # SectionChunk vector model (null = no vector leg, keyword-only search)
+      fts: true                       # native BM25/FTS index over MarkdownSection(title, text, description)
+      chunk_size_tokens: 1500         # target chunk size for long sections
 
-agent:
-  profile: docgraph
-  folder_id: null         # null = whole corpus (agent must pick the right doc)
+    questions:
+      docs_file: data/financebench/target_doc.txt
+      docs:
+        - BESTBUY_2024Q2_10Q
+        - Pfizer_2023Q2_10Q
+        - JOHNSON_JOHNSON_2023_8K_dated-2023-08-30
+      limit: null
+
+    agent:
+      profile: default
+      folder_id: null         # null = whole corpus (agent must pick the right doc)
+
+    judge:
+      enabled: true
+
+  fast_markitdown:
+    description: "Fast run with MarkItDown converter, algorithmic graph build, and keyword-only search"
+    markdownize_profile: fast
+    paths:
+      pdfs_dir: data/pdfs
+      markdown_dir: data/markdown_multi
+      kg_db: data/kg/financebench_fast.db
+      onedrive_markdown_dir: ~/OneDrive/prj/financebench/markdown
+      runs: data/financebench/{profile}/runs.jsonl
+      scores: data/financebench/{profile}/scores.jsonl
+      scores_summary: data/financebench/{profile}/scores_summary.json
+
+    llms:
+      agent: deepseek_v4flash@openrouter
+      build: deepseek_v4flash@openrouter
+      judge: deepseek_v4flash@openrouter
+
+    build:
+      skip_ocr: true
+      force: false
+      llm: false
+      workers: 4
+      summary_min_tokens: 800
+      context_safety_ratio: 0.9
+      embeddings: null
+      fts: true
+      chunk_size_tokens: 1500
+
+    questions:
+      docs_file: data/financebench/target_doc.txt
+      docs:
+        - BESTBUY_2024Q2_10Q
+        - Pfizer_2023Q2_10Q
+        - JOHNSON_JOHNSON_2023_8K_dated-2023-08-30
+      limit: null
+
+    agent:
+      profile: default
+      folder_id: null
+
+    judge:
+      enabled: true
+
+# Document converter definitions and pathspec-driven profiles
+markdownize_profiles:
+  fast:
+    rules:
+      - pathspec: "**/*.{xlsx,xls,ods}"
+        converter: messy_xls
+      - pathspec: "**/*"
+        converter: markitdown
+
+  medium:
+    rules:
+      - pathspec: "**/*.{xlsx,xls,ods}"
+        converter: messy_xls
+      - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf}"
+        converter: via_pdf
+      - pathspec: "**/*.pdf"
+        converter: mistral_ocr
+      - pathspec: "**/*"
+        converter: markitdown
+
+  best:
+    rules:
+      - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf,xlsx,xls,ods}"
+        converter: via_pdf
+      - pathspec: "**/*.pdf"
+        converter: mistral_ocr
+      - pathspec: "**/*"
+        converter: markitdown
+
+# Document Graph configuration for financebench
+knowledge_tree:
+  db_path: ${paths.data_root}/kg/financebench_tree.db
+  markdownize_profile: medium
+
+

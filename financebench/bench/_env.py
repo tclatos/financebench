@@ -1,9 +1,8 @@
 """Shared environment and path constants for the financebench bench harness.
 
 Loads ``~/.env`` so API keys (``HF_TOKEN``, ``MISTRAL_API_KEY``,
-``OPENROUTER_API_KEY`` ...) are available when the bench scripts run via
-``uv run python -m financebench.bench.<module>`` rather than the ``cli``
-entry point (which loads dotenv itself).
+``OPENROUTER_API_KEY`` ...) are available when the bench harness runs via
+the ``cli bench`` entry point or standalone modules.
 
 All paths are derived from this file's location so the scripts work from any
 current working directory.

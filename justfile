@@ -63,30 +63,24 @@ run:
 bench-setup:
     uv sync --extra harnessing
 
-# Full Phase-1 bench: dataset → PDF → OCR/graph → run questions → grade
+# Full benchmark run via CLI
 bench:
-    uv run python -m financebench.bench.load_dataset
-    uv run python -m financebench.bench.fetch_pdf
-    uv run python -m financebench.bench.build_graph
-    uv run python -m financebench.bench.run_questions
-    uv run python -m financebench.bench.grade
+    uv run cli bench run
 
-bench-load:
-    uv run python -m financebench.bench.load_dataset
+# Benchmark run skipping PDF fetch (for already downloaded filings)
+bench-multi:
+    uv run cli bench run --skip fetch
 
 bench-fetch:
-    uv run python -m financebench.bench.fetch_pdf
+    uv run cli bench run --step fetch
 
 bench-build:
-    uv run python -m financebench.bench.build_graph
+    uv run cli bench run --step build
 
 bench-run:
-    uv run python -m financebench.bench.run_questions
+    uv run cli bench run --step run
 
 bench-grade:
-    uv run python -m financebench.bench.grade
+    uv run cli bench run --step grade
 
-# Phase-3 multi-doc corpus-wide bench (temp 0): build hybrid graph + run + grade
-bench-multi:
-    uv run python -m financebench.bench.run --skip fetch
 

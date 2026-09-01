@@ -13,9 +13,9 @@ and flushed on ``aclose()``.
 
 Usage:
 ```bash
-uv run python -m financebench.bench.run_questions
-uv run python -m financebench.bench.run_questions --limit 1
-uv run python -m financebench.bench.run_questions --llm deepseek_v4flash@openrouter
+uv run cli bench run --step run
+uv run cli bench run --step run --limit 1
+uv run cli bench run --step run -p deepseek_flash
 ```
 """
 
@@ -39,7 +39,7 @@ from financebench.bench._env import (
 from financebench.bench.load_dataset import QUESTIONS_PATH
 
 RUNS_PATH = FB_DIR / "runs.jsonl"
-DOCGRAPH_PROFILE = "docgraph"
+DOCGRAPH_PROFILE = "default"
 
 
 def _load_questions(path: Path) -> list[dict]:
@@ -145,7 +145,11 @@ async def _run_all(
         embeddings_id or "off",
     )
     harness = create_docgraph_agent(
-        profile, llm=llm, db_path=db_path, folder_id=folder_id, embeddings_id=embeddings_id
+        profile,
+        llm=llm,
+        db_path=db_path,
+        folder_id=folder_id,
+        embeddings_id=embeddings_id,
     )
 
     records: list[dict] = []

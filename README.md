@@ -57,7 +57,7 @@ flowchart LR
 
 ```bash
 uv sync --extra harnessing        # DeepAgents SDK for the deep agent
-just bench                        # load → fetch → OCR/graph → run → grade
+just bench                        # full benchmark run: fetch → OCR/graph → run → grade
 ```
 
 Prerequisites: a `~/.env` with `HF_TOKEN`, `MISTRAL_API_KEY`,
@@ -65,24 +65,26 @@ Prerequisites: a `~/.env` with `HF_TOKEN`, `MISTRAL_API_KEY`,
 to `$ONEDRIVE/prj/financebench/markdown/`; all other artifacts stay under
 `data/` (gitignored).
 
-Individual steps:
+Individual steps & CLI commands:
 
 ```bash
-just bench-load      # → data/financebench/questions.jsonl (auto-selects target doc)
-just bench-fetch     # → data/pdfs/<doc>.pdf
-just bench-build     # Mistral OCR → data/markdown/ → Ladybug Document Graph
-just bench-run       # 7 questions through the docgraph agent → runs.jsonl
-just bench-grade     # LLM-as-judge → scores.jsonl + scores_summary.json
+cli bench list       # list configured benchmark profiles
+cli bench run        # run active benchmark profile (default: deepseek_flash)
+just bench-fetch     # download PDFs only (cli bench run --step fetch)
+just bench-build     # build Document Graph (cli bench run --step build)
+just bench-run       # run agent over questions (cli bench run --step run)
+just bench-grade     # LLM-as-judge evaluation (cli bench run --step grade)
 cli trajectory list  # inspect recorded agent trajectories (ATOF/ATIF export)
 ```
 
 ## Layout
 
 ```
-financebench/bench/        # bench harness: load_dataset, fetch_pdf, build_graph, run_questions, grade
-config/                    # agents.yaml (docgraph profile), knowledge_tree.yaml, markdownize.yaml
-skills/custom/financebench-qa/SKILL.md   # financial-statement navigation + answering rules
-report/PHASE1.md           # Phase-1 diagnostic + Phase-2 plan
+financebench/bench/        # bench harness: run, build_graph, run_questions, grade, fetch_pdf, load_dataset
+financebench/commands/     # CLI commands: bench_commands, agent_commands
+config/                    # bench.yaml, app_conf.yaml, agents.yaml, providers/
+skills/custom/             # domain skills: financebench-qa, financial-ratios
+report/                    # evaluation reports & analysis
 ```
 
 ## Notes

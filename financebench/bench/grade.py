@@ -14,8 +14,8 @@ question, joined with the run's trajectory summary).
 
 Usage:
 ```bash
-uv run python -m financebench.bench.grade
-uv run python -m financebench.bench.grade --judge deepseek_v4flash@openrouter
+uv run cli bench run --step grade
+uv run cli bench run --step grade -p deepseek_flash
 ```
 """
 

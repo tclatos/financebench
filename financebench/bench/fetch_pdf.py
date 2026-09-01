@@ -6,8 +6,8 @@ markdownize step can OCR it.
 
 Usage:
 ```bash
-uv run python -m financebench.bench.fetch_pdf
-uv run python -m financebench.bench.fetch_pdf --doc AMD_2022_10K
+uv run cli bench run --step fetch
+uv run cli bench run --step fetch -d AMD_2022_10K
 ```
 """
 
