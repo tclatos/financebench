@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +25,18 @@ from loguru import logger
 from prefect import flow, task
 
 from financebench.bench._env import ensure_dirs, load_env
-from financebench.bench.run import BenchConfig
+from financebench.bench.run import BenchConfig, configure_bench_monitoring
 
 _RUNS_WRITE_LOCK = threading.Lock()
 _SCORES_WRITE_LOCK = threading.Lock()
+_QUESTION_SEMAPHORES: dict[int, threading.Semaphore] = {}
+_JUDGE_SEMAPHORES: dict[int, threading.Semaphore] = {}
+
+
+def _get_semaphore(cache: dict[int, threading.Semaphore], capacity: int) -> threading.Semaphore:
+    if capacity not in cache:
+        cache[capacity] = threading.Semaphore(max(1, capacity))
+    return cache[capacity]
 
 
 # ---------------------------------------------------------------------------
@@ -138,12 +147,15 @@ def run_question_task(
     profile_name: str = "default",
     embeddings_id: str | None = None,
     runs_path: str | None = None,
+    concurrency: int = 10,
 ) -> dict[str, Any]:
     """Execute one question against the Document Graph deep agent and record trajectory."""
     from genai_tk.agents.harness.profiles import load_langchain_profiles
 
     from genai_graph.agent import create_docgraph_agent
     from financebench.bench.run_questions import _run_one
+
+    sem = _get_semaphore(_QUESTION_SEMAPHORES, concurrency)
 
     async def _execute() -> dict[str, Any]:
         profiles = load_langchain_profiles()
@@ -164,23 +176,59 @@ def run_question_task(
         finally:
             await harness.aclose()
 
-    record = asyncio.run(_execute())
+    try:
+        with sem:
+            record = asyncio.run(_execute())
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "[{}] Exception during question run: {}",
+            q.get("financebench_id"),
+            exc,
+        )
+        record = {
+            "financebench_id": q.get("financebench_id"),
+            "doc_name": q.get("doc_name", ""),
+            "company": q.get("company", ""),
+            "question_type": q.get("question_type"),
+            "question_reasoning": q.get("question_reasoning"),
+            "question": q.get("question", ""),
+            "gold_answer": q.get("answer", ""),
+            "justification": q.get("justification"),
+            "evidence": q.get("evidence"),
+            "agent_answer": f"Execution error: {exc}",
+            "tool_calls": [],
+            "tool_results": [],
+            "n_tool_calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "error": str(exc),
+            "thread_id": q.get("financebench_id"),
+            "llm": llm,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     if record.get("error"):
         logger.warning(
-            "[{}] Agent turn encountered error: {}",
+            "[{}] Agent turn completed with error: {}",
             q["financebench_id"],
             record["error"],
         )
-        raise RuntimeError(f"Question run error: {record['error']}")
+    else:
+        logger.info(
+            "[{}] → ok ({} tool calls, {} in/{} out tok)",
+            q["financebench_id"],
+            record.get("n_tool_calls", 0),
+            record.get("input_tokens", 0),
+            record.get("output_tokens", 0),
+        )
 
-    logger.info(
-        "[{}] → ok ({} tool calls, {} in/{} out tok)",
-        q["financebench_id"],
-        record.get("n_tool_calls", 0),
-        record.get("input_tokens", 0),
-        record.get("output_tokens", 0),
-    )
+    if runs_path:
+        with _RUNS_WRITE_LOCK:
+            out_p = Path(runs_path)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            with out_p.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
     return record
 
 
@@ -190,12 +238,16 @@ def grade_run_task(
     *,
     judge_llm: str,
     scores_path: str | None = None,
+    concurrency: int = 5,
 ) -> dict[str, Any]:
     """Grade one question run using the LLM-as-judge."""
     from financebench.bench.grade import _grade_one
 
+    sem = _get_semaphore(_JUDGE_SEMAPHORES, concurrency)
+
     try:
-        score = asyncio.run(_grade_one(judge_llm, run))
+        with sem:
+            score = asyncio.run(_grade_one(judge_llm, run))
     except Exception as exc:
         logger.warning("[{}] Grading exception: {}; returning fallback verdict", run["financebench_id"], exc)
         score = {
@@ -300,6 +352,8 @@ def run_questions_flow(
     """Run questions in parallel through the docgraph agent."""
     from financebench.bench.load_dataset import load_financebench, write_questions
 
+    configure_bench_monitoring(cfg.monitoring, project_name=f"financebench-{cfg.profile_name}")
+
     if questions is None:
         df = load_financebench()
         questions = write_questions(df, cfg.docs)
@@ -311,12 +365,13 @@ def run_questions_flow(
     runs_path.write_text("", encoding="utf-8")
 
     logger.info(
-        "Running {} question(s) in parallel (agent={}, db={}, folder={}, embeddings={})",
+        "Running {} question(s) in parallel (agent={}, db={}, folder={}, embeddings={}, concurrency={})",
         len(questions),
         cfg.agent_llm,
         cfg.kg_db,
         cfg.folder_id,
         cfg.embeddings or "off",
+        cfg.question_concurrency,
     )
 
     futures = [
@@ -327,6 +382,8 @@ def run_questions_flow(
             folder_id=cfg.folder_id,
             profile_name=cfg.agent_profile,
             embeddings_id=cfg.embeddings,
+            runs_path=str(runs_path),
+            concurrency=cfg.question_concurrency,
         )
         for q in questions
     ]
@@ -363,7 +420,10 @@ def grade_flow(
     scores_path.write_text("", encoding="utf-8")
 
     logger.info(
-        "Grading {} run(s) in parallel with judge={}", len(runs), cfg.judge_llm
+        "Grading {} run(s) in parallel with judge={} (concurrency={})",
+        len(runs),
+        cfg.judge_llm,
+        cfg.judge_concurrency,
     )
 
     futures = [
@@ -371,6 +431,7 @@ def grade_flow(
             run,
             judge_llm=cfg.judge_llm,
             scores_path=str(scores_path),
+            concurrency=cfg.judge_concurrency,
         )
         for run in runs
     ]
@@ -407,15 +468,17 @@ def bench_flow(
     from genai_tk.utils.prefect_logging import install_loguru_prefect_bridge
 
     install_loguru_prefect_bridge()
+    configure_bench_monitoring(cfg.monitoring, project_name=f"financebench-{cfg.profile_name}")
     load_env()
     ensure_dirs()
 
     active_steps = steps or ["fetch", "build", "run", "grade"]
     logger.info(
-        "Executing FinanceBench pipeline (profile='{}', steps={}, docs={})",
+        "Executing FinanceBench pipeline (profile='{}', steps={}, docs={}, monitoring={})",
         cfg.profile_name,
         active_steps,
-        cfg.docs,
+        len(cfg.docs),
+        cfg.monitoring or "none",
     )
 
     results: dict[str, Any] = {}

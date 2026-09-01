@@ -122,6 +122,14 @@ class BenchCommands(CliTopCommand):
                 int | None,
                 typer.Option("-n", "--limit", help="Run only the first N questions"),
             ] = None,
+            monitoring: Annotated[
+                str | None,
+                typer.Option(
+                    "-m",
+                    "--monitoring",
+                    help="Tracing monitoring method ('none', 'langchain', 'langsmith', 'langfuse', 'local')",
+                ),
+            ] = None,
             force: Annotated[
                 bool,
                 typer.Option("--force", help="Force rebuild of OCR and document graph"),
@@ -172,6 +180,8 @@ class BenchCommands(CliTopCommand):
 
             if limit is not None:
                 cfg.limit = limit
+            if monitoring is not None:
+                cfg.monitoring = monitoring
             if judge is not None:
                 cfg.judge_enabled = judge
             if force:

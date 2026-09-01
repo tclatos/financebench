@@ -63,6 +63,9 @@ class BenchConfig(BaseModel):
     agent_profile: str = "default"
     folder_id: str | None = None
     judge_enabled: bool = True
+    monitoring: str | list[str] | None = None
+    question_concurrency: int = 10
+    judge_concurrency: int = 5
 
     def model_post_init(self, __context) -> None:
         """Expand ``~``, interpolate ``{profile}``, and resolve project-relative paths to absolute."""
@@ -205,9 +208,54 @@ def load_bench_profile(
         agent_profile=agent.get("profile", "default"),
         folder_id=agent.get("folder_id"),
         judge_enabled=bool(judge.get("enabled", True)),
+        monitoring=prof_data.get("monitoring", None),
+        question_concurrency=int(agent.get("concurrency", 10)),
+        judge_concurrency=int(judge.get("concurrency", 5)),
     )
     cfg.docs = cfg.resolve_docs()
     return cfg
+
+
+def configure_bench_monitoring(
+    monitoring: str | list[str] | None, project_name: str = "financebench"
+) -> None:
+    """Configure or disable tracing monitoring (LangSmith/LangChain, LangFuse, local, etc.)."""
+    import os
+    from genai_tk.utils.tracing import reset_monitoring, setup_monitoring
+
+    if not monitoring or str(monitoring).lower() in ("none", "null", "off", "false"):
+        os.environ["LANGSMITH_TRACING"] = "false"
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+        reset_monitoring()
+        return
+
+    backends = [monitoring] if isinstance(monitoring, str) else list(monitoring)
+    normalized_backends: list[str] = []
+    for b in backends:
+        b_str = str(b).strip().lower()
+        if b_str in ("langchain", "langsmith"):
+            normalized_backends.append("langsmith")
+        elif b_str in ("langfuse", "local", "otel"):
+            normalized_backends.append(b_str)
+
+    os.environ["LANGSMITH_PROJECT"] = project_name
+    if "langsmith" in normalized_backends:
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    else:
+        os.environ["LANGSMITH_TRACING"] = "false"
+        os.environ.pop("LANGCHAIN_TRACING_V2", None)
+
+    try:
+        root = global_config().root
+        if "monitoring" in root:
+            root.monitoring.backends = normalized_backends
+            root.monitoring.project = project_name
+    except Exception:
+        pass
+
+    reset_monitoring()
+    setup_monitoring()
 
 
 def _step_fetch(cfg: BenchConfig) -> None:

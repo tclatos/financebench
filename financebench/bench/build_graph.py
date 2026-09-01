@@ -34,6 +34,7 @@ import argparse
 import asyncio
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -75,7 +76,11 @@ def _resolve_build_llm(llm: str | None) -> str | None:
 
 
 def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
-    """Return the Markdown text for *pdf_path* via the configured markdownize profile (e.g. mistral_ocr)."""
+    """Return the Markdown text for *pdf_path* via the configured markdownize profile.
+
+    Retries the primary converter (e.g. mistral_ocr) with exponential backoff on transient errors,
+    and falls back to `anydoc` (preferred), then `markitdown` if needed.
+    """
     from genai_tk.extra.markdownize.factory import ConverterFactory
     from genai_tk.workflow.markdownize.config import get_markdownize_profile
 
@@ -90,26 +95,57 @@ def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
         )
         converter_name = "mistral_ocr"
 
-    try:
-        converter = ConverterFactory.create(converter_name)
-        text = asyncio.run(converter.convert(pdf_path))
-        if text:
-            logger.success(
-                "{} conversion completed for {}", converter_name, pdf_path.name
+    # 1. Primary conversion attempt with exponential backoff for OCR APIs
+    max_retries = 3 if converter_name in ("mistral_ocr", "mistral", "lighton_ocr") else 1
+    for attempt in range(1, max_retries + 1):
+        try:
+            converter = ConverterFactory.create(converter_name)
+            text = asyncio.run(converter.convert(pdf_path))
+            if text and text.strip():
+                logger.success(
+                    "{} conversion completed for {}", converter_name, pdf_path.name
+                )
+                return text
+            logger.warning(
+                "Converter {} returned no text for {} (attempt {}/{})",
+                converter_name,
+                pdf_path.name,
+                attempt,
+                max_retries,
             )
-            return text
-        logger.warning(
-            "Converter {} returned no text for {}; using markitdown fallback.",
-            converter_name,
-            pdf_path.name,
-        )
-    except Exception as exc:  # noqa: BLE101
-        logger.warning(
-            "Conversion with {} failed ({}); falling back to markitdown for {}.",
-            converter_name,
-            exc,
-            pdf_path.name,
-        )
+        except Exception as exc:  # noqa: BLE101
+            logger.warning(
+                "Conversion attempt {}/{} with {} failed for {} ({})",
+                attempt,
+                max_retries,
+                converter_name,
+                pdf_path.name,
+                exc,
+            )
+            if attempt < max_retries:
+                time.sleep(2**attempt)
+
+    # 2. Preferred fallback: anydoc
+    if converter_name != "anydoc":
+        try:
+            logger.info("Falling back to anydoc converter for {}", pdf_path.name)
+            anydoc_conv = ConverterFactory.create("anydoc")
+            text = asyncio.run(anydoc_conv.convert(pdf_path))
+            if text and text.strip():
+                logger.success(
+                    "anydoc fallback conversion completed for {}", pdf_path.name
+                )
+                return text
+            logger.warning("anydoc returned empty text for {}", pdf_path.name)
+        except Exception as exc:  # noqa: BLE101
+            logger.warning(
+                "anydoc fallback failed for {} ({}); falling back to markitdown",
+                pdf_path.name,
+                exc,
+            )
+
+    # 3. Final fallback: markitdown
+    logger.info("Falling back to markitdown for {}", pdf_path.name)
     fallback_converter = ConverterFactory.create("markitdown")
     return asyncio.run(fallback_converter.convert(pdf_path))
 

@@ -52,7 +52,11 @@ Use `get_document_toc` to inspect the outline, but keep these critical structura
 
 - **Verify Column Headers & Periods**:
   - Always verify table column dates (e.g. *June 30, 2023* vs *June 30, 2022* or *FY22* vs *FY21*).
-- **Handling Question Ambiguities**:
+- **Handling Question Ambiguities & Dual Conventions**:
+  - *Company Disambiguation for Anonymous Questions*: When a question omits the company name (e.g., *"What drove the reduction in SG&A expense in FY2023?"*), inspect the candidate documents in the corpus for that fiscal period to identify the relevant filing and state the company name clearly in your conclusion.
+  - *Acronyms & Financial Terms*: "PPNE" maps directly to **Property, Plant and Equipment, Net** (PP&E Net).
+  - *Dual-Formula Conventions*: For Quick Ratio, state both Acid-Test (excluding prepaids) and Alternative (including prepaids); for Inventory Turnover, state both Average and Ending inventory formulas; for Liquidation Value, state both Common BVPS and Tangible BVPS.
+  - *Statement Face vs Footnotes*: If asked for items "directly outlined in the income statement" that are subsumed into general lines, state $0 on statement face and cite the detailed Note amount.
   - *Best Performing / Top Line Performance*: If a question asks which category/segment "performed best" without specifying metric, report **both** highest percentage growth (% YoY) and highest absolute revenue ($) with supporting figures.
   - *Corporate Actions & Spin-offs*: Clearly distinguish between completed spin-offs (discontinued operations), announced transactions, and historical events.
   - *Non-GAAP vs. GAAP*: If a metric is non-GAAP, state the GAAP figure first and provide the Non-GAAP reconciliation/figure with clear labels.

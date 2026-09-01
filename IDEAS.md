@@ -1,3 +1,15 @@
+# Ready for all bench ! 
+
+The benchmark has been run on 30 selected files. We want to run it now on all the files. But first, we can implement some  recommended improvement.
+Read the report/PHASE6.md, and plan implementing all recommended improvement. 
+
+In addition : 
+- Change fallback if Mistral OCR fail => select anydoc  (shouls always be prefered to markitdown)
+
+- add in the bench.yaml file the ability to select trace monitoring method (langchain, langfuse, ...). Select None for now.
+
+- 
+
 
 
 # Review 
@@ -14,7 +26,6 @@ Is  there other reason than using stronger LLM ?
 
 I also wonder why the search tool is so used. Is the table of content not enough informative (could we improve the process to pass from Markdow doc to sections ? the summaries ? ) ? or the skill not providing correct approach  ? 
 
-Clearly,  skills can be improved.
 
 
 Also there has been many changes in the code. Have a look at it and see if it could be simplified, made more generic etc. 

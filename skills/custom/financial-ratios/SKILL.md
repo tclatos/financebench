@@ -23,11 +23,14 @@ Canonical definitions, formulas, line-item locations, and critical conventions f
 ## 1. Liquidity
 
 ### Quick Ratio (Acid-Test)
-- **Formula**: `(Total Current Assets - Inventories - Prepaid Expenses) / Total Current Liabilities`
-- **Alternate**: `(Cash & Cash Equivalents + Marketable Securities + Net Accounts Receivable) / Total Current Liabilities`
+- **Standard (Acid-Test) Formula**: `(Cash & Cash Equivalents + Marketable Securities + Net Accounts Receivable) / Total Current Liabilities` (or `(Total Current Assets - Inventories - Prepaid Expenses) / Total Current Liabilities`)
+- **Alternative Formula**: `(Total Current Assets - Inventories) / Total Current Liabilities` (includes prepaid expenses)
 - **Location**: Balance Sheet — Current Assets & Current Liabilities sections.
-- **Conventions**:
-  - **Excludes inventory and prepaid expenses** (key distinction from Current Ratio).
+- **Conventions & Dual-Response Rule**:
+  - **Always calculate and state BOTH values**:
+    1. Standard Acid-Test (excluding inventory and prepaid expenses)
+    2. Alternative Quick Ratio (excluding inventory only, including prepaid expenses)
+  - State both clearly (e.g. "Standard Quick Ratio (excluding prepaids) = X.XX; Alternative Quick Ratio (Current Assets - Inventory) = Y.YY").
   - A quick ratio $\ge 1.0$ is healthy; $< 1.0$ indicates inability to cover current liabilities with liquid assets.
   - Use period-end balance sheet values.
 
@@ -135,11 +138,14 @@ Canonical definitions, formulas, line-item locations, and critical conventions f
 ## 4. Efficiency & Operations
 
 ### Inventory Turnover
-- **Formula**: `COGS / Average Inventory` (or `COGS / Ending Inventory`)
+- **Formula (Average Inventory)**: `COGS / Average Inventory` where Average Inventory = `(Beginning + Ending) / 2`
+- **Formula (Ending Inventory)**: `COGS / Ending Inventory`
 - **Location**: Income Statement (COGS / Cost of Sales) & Balance Sheet (Inventory).
-- **Conventions**:
+- **Conventions & Dual-Response Rule**:
   - Use COGS in numerator, **not revenue**.
-  - Average inventory = `(Beginning + Ending) / 2` (where beginning = prior year balance sheet ending).
+  - **Always calculate and state BOTH formulas**:
+    1. Average Inventory: `COGS / ((Beginning Inv + Ending Inv) / 2)`
+    2. Ending Inventory: `COGS / Ending Inv`
   - Equivalent to "how many times the company has sold its inventory".
 
 ### Days Sales Outstanding (DSO)
@@ -165,12 +171,13 @@ Canonical definitions, formulas, line-item locations, and critical conventions f
 
 ## 5. Cash Flow & Shareholder Returns
 
-### Capital Expenditure (CapEx)
+### Capital Expenditure (CapEx) / PP&E / PPNE
 - **Formula**: Purchases of Property, Plant and Equipment (from Cash Flow Statement)
-- **Location**: Cash Flow Statement — Investing Activities section.
-- **Conventions**:
+- **Location**: Cash Flow Statement — Investing Activities section; Balance Sheet — Property, Plant and Equipment, Net.
+- **Conventions & Acronym Mapping**:
+  - **"PPNE" / "PP&E Net"**: Refers to **Property, Plant and Equipment, Net** on the Balance Sheet. (Do NOT confuse with Pension & Postretirement Non-service Expense).
   - Look for "Purchases of property, plant and equipment" or "Capital expenditures".
-  - Reported as negative (cash outflow); quote the **absolute positive value**.
+  - Reported as negative (cash outflow); quote the **absolute positive value** for CapEx.
   - Do not include acquisitions/business combinations.
 
 ### Free Cash Flow (FCF)
@@ -195,11 +202,14 @@ Canonical definitions, formulas, line-item locations, and critical conventions f
 - **Formula**: `Stock Price / EPS`
 - **Location**: Market price & Income Statement (EPS).
 
-### Book Value Per Share (BVPS)
-- **Formula**: `(Total Shareholders' Equity - Preferred Equity) / Common Shares Outstanding`
-- **Location**: Balance Sheet (Stockholders' Equity, Common Shares Outstanding on face).
-- **Conventions**:
-  - **Liquidation Scenario**: Represents theoretical per-share payout if assets liquidated at book value.
+### Book Value Per Share (BVPS) & Liquidation Value
+- **Common BVPS Formula**: `(Total Common Shareholders' Equity - Preferred Equity) / Common Shares Outstanding`
+- **Tangible BVPS Formula**: `(Total Common Equity - Preferred Equity - Goodwill - Intangible Assets) / Common Shares Outstanding`
+- **Location**: Balance Sheet (Stockholders' Equity, Common Shares Outstanding on face; Intangibles / Goodwill).
+- **Conventions & Dual-Response Rule**:
+  - **Liquidation Scenario**: When asked how much shareholders receive if a company liquidates assets at book value, provide **BOTH**:
+    1. Common Book Value per Share = `Total Common Equity / Common Shares`
+    2. Tangible Book Value per Share = `(Total Common Equity - Goodwill - Intangibles) / Common Shares`
   - Use common shares outstanding from balance sheet face (do **not** use diluted shares).
   - For banks, use "Total stockholders' equity", excluding non-controlling interests.
 
@@ -212,6 +222,9 @@ Canonical definitions, formulas, line-item locations, and critical conventions f
 - **Location**: Notes to Financial Statements — "Derivative Instruments" / "Hedging Activities".
 - **Conventions**: Reported directly in notes tables; identify contract with highest aggregate notional amount.
 
-### Restructuring Costs
+### Restructuring Costs & Primary Statement vs Footnotes
 - **Description**: One-time reorganization, severance, or facility closure charges.
-- **Location**: Income Statement (line item if broken out) or Notes to Financial Statements.
+- **Location**: Income Statement (face) and Notes to Consolidated Financial Statements (e.g. Note on Restructuring).
+- **Conventions & Dual-Response Rule**:
+  - If asked for restructuring costs "directly outlined in the income statement" or similar:
+    - If restructuring is **not** broken out as a separate line item on the statement face (e.g., subsumed into SG&A or Cost of Goods Sold): state **$0 (or not explicitly outlined as a standalone line item) on the face of the Income Statement**, but **explicitly provide the detailed restructuring figure from the Notes to Financial Statements** (e.g., "$411 million detailed in Note 3").

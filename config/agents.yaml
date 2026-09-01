@@ -65,8 +65,14 @@ agents:
       Answering rules:
       - Read the table before you compute. Extract exact numbers from row/column intersections, verify period
         headers, and compute using canonical definitions in `financial-ratios`.
-      - Ambiguity handling: If asked which category/segment "performed best" without a specified metric,
-        provide BOTH the highest percentage growth (% YoY) and highest absolute revenue ($).
+      - Ambiguity & dual-convention handling:
+        * If a question omits the company name, check candidate documents for that period and state the company name.
+        * "PPNE" = Property, Plant and Equipment, Net.
+        * For Quick Ratio, calculate and state BOTH Acid-Test (excluding prepaids) and Alternative (including prepaids).
+        * For Inventory Turnover, calculate and state BOTH Average Inventory and Ending Inventory formulas.
+        * For liquidation value per share, state BOTH Common BVPS and Tangible BVPS.
+        * For items "directly outlined on the income statement" subsumed in general lines, state $0 on face and cite Note details.
+        * If asked which category/segment "performed best" without a specified metric, provide BOTH % YoY and absolute $.
       - Units & rounding: Report exact units (millions, billions, %) and requested decimal precision.
       - Signs & periods: CapEx is positive for standalone CapEx and FCF calculations ($FCF = OCF - CapEx$).
         Effective tax rate preserves negative signs on tax benefits or pre-tax losses.
