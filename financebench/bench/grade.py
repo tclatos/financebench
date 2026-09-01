@@ -123,6 +123,12 @@ async def _grade_one(judge_llm_id: str, run: dict) -> dict:
     content = resp.content if isinstance(resp.content, str) else str(resp.content)
     try:
         verdict = _extract_json(content)
+        if "groundedness" not in verdict:
+            if "grounded" in verdict:
+                g_val = verdict.pop("grounded")
+                verdict["groundedness"] = "grounded" if g_val is True else "ungrounded"
+            else:
+                verdict["groundedness"] = "grounded" if verdict.get("correctness") == "correct" else "partial"
     except Exception as exc:  # noqa: BLE101
         verdict = {
             "correctness": "incorrect",
@@ -182,12 +188,14 @@ def _summarize(scores: list[dict]) -> dict:
     n = len(scores)
     if not n:
         return {"n": 0}
-    correct = sum(1 for s in scores if s["correctness"] == "correct")
-    partial = sum(1 for s in scores if s["correctness"] == "partial")
-    incorrect = sum(1 for s in scores if s["correctness"] == "incorrect")
-    grounded = sum(1 for s in scores if s["groundedness"] == "grounded")
-    numeric = [s for s in scores if s["numeric_match"] is not None]
-    numeric_ok = sum(1 for s in numeric if s["numeric_match"] is True)
+    correct = sum(1 for s in scores if s.get("correctness") == "correct")
+    partial = sum(1 for s in scores if s.get("correctness") == "partial")
+    incorrect = sum(1 for s in scores if s.get("correctness") == "incorrect")
+    grounded = sum(
+        1 for s in scores if s.get("groundedness") == "grounded" or s.get("grounded") is True
+    )
+    numeric = [s for s in scores if s.get("numeric_match") is not None]
+    numeric_ok = sum(1 for s in numeric if s.get("numeric_match") is True)
     return {
         "n": n,
         "correct": correct,
@@ -199,9 +207,9 @@ def _summarize(scores: list[dict]) -> dict:
         "groundedness_rate": round(grounded / n, 3),
         "numeric_questions": len(numeric),
         "numeric_match_rate": round(numeric_ok / len(numeric), 3) if numeric else None,
-        "avg_tool_calls": round(sum(s["n_tool_calls"] for s in scores) / n, 2),
-        "avg_input_tokens": round(sum(s["input_tokens"] for s in scores) / n),
-        "avg_output_tokens": round(sum(s["output_tokens"] for s in scores) / n),
+        "avg_tool_calls": round(sum(s.get("n_tool_calls", 0) for s in scores) / n, 2),
+        "avg_input_tokens": round(sum(s.get("input_tokens", 0) for s in scores) / n),
+        "avg_output_tokens": round(sum(s.get("output_tokens", 0) for s in scores) / n),
     }
 
 

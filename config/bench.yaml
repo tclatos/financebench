@@ -26,9 +26,9 @@ bench_profiles:
       judge: DeepSeek-V4-Pro-0813@openrouter
 
     build:
-      skip_ocr: false
+      skip_ocr: true
       force: true
-      llm: true              # false = fast algorithmic TOC & heading parsing; true = LLM-enhanced
+      llm: false             # false = fast algorithmic TOC & heading parsing; true = LLM-enhanced
       workers: 4
       summary_min_tokens: 800
       context_safety_ratio: 0.9
@@ -38,9 +38,36 @@ bench_profiles:
 
     files:
       pathspecs:
+        - "AMD_2022_10K*"
+        - "AMERICANEXPRESS_2022_10K*"
+        - "BOEING_2022_10K*"
+        - "PEPSICO_2022_10K*"
+        - "AMCOR_2023_10K*"
+        - "3M_2022_10K*"
+        - "AES_2022_10K*"
+        - "BESTBUY_2023_10K*"
+        - "JOHNSON_JOHNSON_2022_10K*"
+        - "PFIZER_2021_10K*"
+        - "3M_2023Q2_10Q*"
         - "BESTBUY_2024Q2_10Q*"
         - "Pfizer_2023Q2_10Q*"
+        - "JPMORGAN_2021Q1_10Q*"
+        - "AMCOR_2023Q2_10Q*"
+        - "JPMORGAN_2022Q2_10Q*"
+        - "JPMORGAN_2023Q2_10Q*"
+        - "MGMRESORTS_2023Q2_10Q*"
         - "JOHNSON_JOHNSON_2023_8K_dated-2023-08-30*"
+        - "PEPSICO_2023_8K_dated-2023-05-30*"
+        - "AMCOR_2022_8K_dated-2022-07-01*"
+        - "FOOTLOCKER_2022_8K_dated-2022-05-20*"
+        - "FOOTLOCKER_2022_8K_dated_2022-08-19*"
+        - "PEPSICO_2023_8K_dated-2023-05-05*"
+        - "ULTABEAUTY_2023Q4_EARNINGS*"
+        - "MGMRESORTS_2022Q4_EARNINGS*"
+        - "AMCOR_2023Q4_EARNINGS*"
+        - "JOHNSON_JOHNSON_2022Q4_EARNINGS*"
+        - "PEPSICO_2023Q1_EARNINGS*"
+        - "JOHNSON_JOHNSON_2023Q2_EARNINGS*"
       limit: null
 
     agent:

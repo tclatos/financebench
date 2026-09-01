@@ -75,7 +75,7 @@ def markdownize_doc_task(
     else:
         md_path = markdownize_target(
             doc_name,
-            force=force,
+            force=False,
             pdfs_dir=pdfs,
             onedrive_markdown_dir=onedrive,
             markdownize_profile=markdownize_profile,
@@ -184,7 +184,7 @@ def run_question_task(
     return record
 
 
-@task(retries=3, retry_delay_seconds=2, task_run_name="grade-run-{run[financebench_id]}")
+@task(retries=5, retry_delay_seconds=3, task_run_name="grade-run-{run[financebench_id]}")
 def grade_run_task(
     run: dict[str, Any],
     *,
@@ -194,7 +194,28 @@ def grade_run_task(
     """Grade one question run using the LLM-as-judge."""
     from financebench.bench.grade import _grade_one
 
-    score = asyncio.run(_grade_one(judge_llm, run))
+    try:
+        score = asyncio.run(_grade_one(judge_llm, run))
+    except Exception as exc:
+        logger.warning("[{}] Grading exception: {}; returning fallback verdict", run["financebench_id"], exc)
+        score = {
+            "financebench_id": run["financebench_id"],
+            "doc_name": run["doc_name"],
+            "question_type": run.get("question_type"),
+            "question_reasoning": run.get("question_reasoning"),
+            "question": run["question"],
+            "gold_answer": run.get("gold_answer", ""),
+            "agent_answer": run.get("agent_answer", ""),
+            "n_tool_calls": run.get("n_tool_calls", 0),
+            "input_tokens": run.get("input_tokens", 0),
+            "output_tokens": run.get("output_tokens", 0),
+            "error": str(exc),
+            "judge_llm": judge_llm,
+            "correctness": "incorrect",
+            "numeric_match": None,
+            "groundedness": "ungrounded",
+            "rationale": f"Grading error: {exc}",
+        }
 
     if scores_path:
         with _SCORES_WRITE_LOCK:
@@ -349,6 +370,7 @@ def grade_flow(
         grade_run_task.submit(
             run,
             judge_llm=cfg.judge_llm,
+            scores_path=str(scores_path),
         )
         for run in runs
     ]

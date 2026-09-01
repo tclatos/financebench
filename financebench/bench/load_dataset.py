@@ -91,7 +91,15 @@ def questions_for_doc(df: pd.DataFrame, doc_name: str) -> list[dict]:
     sub = df[df["doc_name"] == doc_name].sort_values("financebench_id")
     rows: list[dict] = []
     for _, row in sub.iterrows():
-        evidence = row.get("evidence") or []
+        raw_evidence = row.get("evidence")
+        if raw_evidence is None or (isinstance(raw_evidence, float) and math.isnan(raw_evidence)):
+            evidence = []
+        elif hasattr(raw_evidence, "__len__") and len(raw_evidence) == 0:
+            evidence = []
+        elif hasattr(raw_evidence, "tolist"):
+            evidence = raw_evidence.tolist()
+        else:
+            evidence = raw_evidence or []
         rows.append(
             {
                 "financebench_id": row["financebench_id"],
