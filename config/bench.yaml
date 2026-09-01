@@ -28,7 +28,7 @@ bench_profiles:
     build:
       skip_ocr: false
       force: true
-      llm: false             # false = fast algorithmic TOC & heading parsing; true = LLM-enhanced
+      llm: true              # false = fast algorithmic TOC & heading parsing; true = LLM-enhanced
       workers: 4
       summary_min_tokens: 800
       context_safety_ratio: 0.9

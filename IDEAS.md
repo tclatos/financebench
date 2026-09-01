@@ -1,11 +1,5 @@
 
 
-# Use 
- - latest deepseek-v4-flash-7XXX
- - GLM 5.2 (as Mistral memo)
-
-
-
 # better genai-graph
 
 - Update in genai-graph  the  cli docgraph commands so that they  take into account the new feature related to chunks

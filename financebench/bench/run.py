@@ -213,127 +213,35 @@ def load_bench_profile(
 
 
 def _step_fetch(cfg: BenchConfig) -> None:
-    """Download each configured doc's PDF."""
-    from financebench.bench.fetch_pdf import fetch_pdf
+    """Download each configured doc's PDF using Prefect fetch_flow."""
+    from financebench.bench.flows import fetch_flow
 
-    for doc in cfg.docs:
-        fetch_pdf(doc, pdfs_dir=Path(cfg.pdfs_dir))
+    fetch_flow(cfg)
 
 
 def _step_build(cfg: BenchConfig) -> None:
-    """OCR/markdownize each doc, copy it in, then build the graph once."""
-    from financebench.bench.build_graph import (
-        MD_FILENAME_SUFFIX,
-        build_document_graph,
-        copy_markdown_to_project,
-        markdownize_target,
-    )
+    """OCR/markdownize each doc, copy it in, then build the graph once using Prefect flows."""
+    from financebench.bench.flows import build_graph_flow, markdownize_flow
 
-    pdfs = Path(cfg.pdfs_dir)
-    onedrive = Path(cfg.onedrive_markdown_dir)
-    md_dir = Path(cfg.markdown_dir)
-    md_dir.mkdir(parents=True, exist_ok=True)
-    for doc in cfg.docs:
-        if cfg.skip_ocr:
-            md_path = onedrive / f"{doc}{MD_FILENAME_SUFFIX}"
-            if not md_path.exists():
-                raise SystemExit(
-                    f"--skip-ocr set but markdown not found: {md_path}; "
-                    "run without --skip fetch first."
-                )
-        else:
-            md_path = markdownize_target(
-                doc,
-                force=cfg.build_force,
-                pdfs_dir=pdfs,
-                onedrive_markdown_dir=onedrive,
-                markdownize_profile=cfg.markdownize_profile,
-            )
-        copy_markdown_to_project(md_path, markdown_dir=md_dir)
-
-    llm_arg = cfg.build_llm if cfg.build_llm_enabled else None
-    Path(cfg.kg_db).parent.mkdir(parents=True, exist_ok=True)
-    result = build_document_graph(
-        cfg.docs[0] if cfg.docs else "",
-        force=cfg.build_force,
-        llm=llm_arg,
-        workers=cfg.workers,
-        summary_min_tokens=cfg.summary_min_tokens,
-        context_safety_ratio=cfg.context_safety_ratio,
-        markdown_dir=md_dir,
-        kg_db=Path(cfg.kg_db),
-        embeddings_id=cfg.embeddings,
-        fts=cfg.fts,
-        chunk_size_tokens=cfg.chunk_size_tokens,
-    )
-    logger.success(
-        "Graph built: {} sections, {} summarized, {} doc(s) ({} degraded)",
-        result.get("sections_created"),
-        result.get("sections_summarized"),
-        result.get("documents_processed"),
-        result.get("files_degraded"),
-    )
+    markdownize_flow(cfg)
+    build_graph_flow(cfg)
 
 
 def _step_run(cfg: BenchConfig) -> None:
-    """Write the multi-doc questions, then run the agent over them."""
-    from financebench.bench.load_dataset import load_financebench, write_questions
-    from financebench.bench.run_questions import _run_all
+    """Write the multi-doc questions, then run the agent over them using Prefect run_questions_flow."""
+    from financebench.bench.flows import run_questions_flow
 
-    df = load_financebench()
-    questions = write_questions(df, cfg.docs)
-    if cfg.limit:
-        questions = questions[: cfg.limit]
-
-    runs_path = Path(cfg.runs)
-    runs_path.parent.mkdir(parents=True, exist_ok=True)
-    runs_path.write_text("", encoding="utf-8")
-    logger.info(
-        "Running {} question(s) over {} (agent={}, db={}, folder={})",
-        len(questions),
-        cfg.docs,
-        cfg.agent_llm,
-        cfg.kg_db,
-        cfg.folder_id,
-    )
-    asyncio.run(
-        _run_all(
-            questions,
-            cfg.agent_llm,
-            cfg.kg_db,
-            folder_id=cfg.folder_id,
-            profile_name=cfg.agent_profile,
-            runs_path=runs_path,
-            embeddings_id=cfg.embeddings,
-        )
-    )
-    print(f"runs={runs_path}")
+    run_questions_flow(cfg)
+    print(f"runs={cfg.runs}")
 
 
 def _step_grade(cfg: BenchConfig) -> None:
-    """Grade the runs and write the scores + summary."""
-    from financebench.bench.grade import _grade_all, _summarize
+    """Grade the runs and write the scores + summary using Prefect grade_flow."""
+    from financebench.bench.flows import grade_flow
 
-    runs_path = Path(cfg.runs)
-    scores_path = Path(cfg.scores)
-    if not runs_path.exists():
-        logger.warning("Runs file does not exist: {}. Skipping grade.", runs_path)
-        return
-    runs = [
-        json.loads(line)
-        for line in runs_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    scores_path.parent.mkdir(parents=True, exist_ok=True)
-    scores_path.write_text("", encoding="utf-8")
-    logger.info("Grading {} run(s) with judge={}", len(runs), cfg.judge_llm)
-    scores = asyncio.run(_grade_all(runs, cfg.judge_llm, scores_path=scores_path))
-    summary = _summarize(scores)
-    summary_path = Path(cfg.scores_summary)
-    summary_path.parent.mkdir(parents=True, exist_ok=True)
-    summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"scores={scores_path}")
-    print(f"summary={json.dumps(summary)}")
+    grade_flow(cfg)
+    print(f"scores={cfg.scores}")
+    print(f"summary={cfg.scores_summary}")
 
 
 def run_bench(
@@ -343,7 +251,9 @@ def run_bench(
     skip: list[str] | None = None,
     step: str | None = None,
 ) -> None:
-    """Execute the benchmark pipeline stages for *cfg*."""
+    """Execute the benchmark pipeline stages for *cfg* via Prefect orchestration."""
+    from financebench.bench.flows import bench_flow
+
     load_env()
     ensure_dirs()
 
@@ -368,15 +278,7 @@ def run_bench(
         selected_steps,
         cfg.docs,
     )
-    for s in selected_steps:
-        if s == "fetch":
-            _step_fetch(cfg)
-        elif s == "build":
-            _step_build(cfg)
-        elif s == "run":
-            _step_run(cfg)
-        elif s == "grade":
-            _step_grade(cfg)
+    bench_flow(cfg, steps=selected_steps)
 
 
 def main(argv: list[str] | None = None) -> int:

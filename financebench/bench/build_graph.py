@@ -246,6 +246,9 @@ def build_document_graph(
         embeddings_id or "off",
         fts,
     )
+    from genai_tk.utils.ladybug import clear_shared_database_cache
+
+    clear_shared_database_cache()
     backend = KuzuBackend()
     backend.connect(str(db_path))
     try:
