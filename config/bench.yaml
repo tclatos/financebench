@@ -35,13 +35,15 @@ bench_profiles:
     build:
       skip_ocr: false
       force: false
-      llm: false             # false = fast algorithmic TOC & heading parsing; true = LLM-enhanced
+      llm: deepseek-v4-flash-0731@openrouter  # LLM used for structure and summaries (or false for pure algorithmic)
+      structure_strategy: auto                # auto | algo | toc_preamble | llm_full
+      summaries: true                         # generate LLM section descriptions & summaries (for get_document_toc)
       workers: 4
       summary_min_tokens: 800
       context_safety_ratio: 0.9
-      embeddings: qwen3_06b@deepinfra  # SectionChunk vector model (null = no vector leg, keyword-only search)
-      fts: true                       # native BM25/FTS index over MarkdownSection(title, text, description)
-      chunk_size_tokens: 1500         # target chunk size for long sections
+      embeddings: qwen3_06b@deepinfra         # SectionChunk vector model (null = no vector leg, keyword-only search)
+      fts: true                               # native BM25/FTS index over MarkdownSection(title, text, description)
+      chunk_size_tokens: 1500                 # target chunk size for long sections
 
     files:
       pathspecs:

@@ -51,6 +51,8 @@ class BenchConfig(BaseModel):
     skip_ocr: bool = False
     build_force: bool = True
     build_llm_enabled: bool = True
+    structure_strategy: str = "auto"
+    generate_summaries: bool = True
     workers: int = 4
     summary_min_tokens: int = 800
     context_safety_ratio: float = 0.9
@@ -196,6 +198,8 @@ def load_bench_profile(
         skip_ocr=bool(build.get("skip_ocr", False)),
         build_force=bool(build.get("force", True)),
         build_llm_enabled=bool(build.get("llm", True)),
+        structure_strategy=str(build.get("structure_strategy", "auto")),
+        generate_summaries=bool(build.get("summaries", build.get("generate_summaries", build.get("llm", True)))),
         workers=int(build.get("workers", 4)),
         summary_min_tokens=int(build.get("summary_min_tokens", 800)),
         context_safety_ratio=float(build.get("context_safety_ratio", 0.9)),

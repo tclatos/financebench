@@ -222,6 +222,8 @@ def build_document_graph(
     *,
     force: bool,
     llm: str | None = None,
+    structure_strategy: str = "auto",
+    generate_summaries: bool = True,
     llm_max_tokens: int | None = None,
     summary_min_tokens: int = 800,
     workers: int = 4,
@@ -258,10 +260,12 @@ def build_document_graph(
 
     resolved_llm = _resolve_build_llm(llm)
     outline_config: OutlineConfig | None = None
-    if resolved_llm is not None:
+    if resolved_llm is not None or structure_strategy != "algo":
         cache_root = str(Path(db_path).with_suffix("")) + "_outlines"
         outline_config = OutlineConfig(
             llm=resolved_llm,
+            structure_strategy=structure_strategy,
+            generate_summaries=generate_summaries,
             llm_max_tokens=llm_max_tokens,
             summary_min_tokens=summary_min_tokens,
             cache_root=cache_root,
