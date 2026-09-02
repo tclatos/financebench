@@ -362,11 +362,32 @@ def run_questions_flow(
 
     runs_path = Path(cfg.runs)
     runs_path.parent.mkdir(parents=True, exist_ok=True)
-    runs_path.write_text("", encoding="utf-8")
+
+    existing_records: dict[str, dict[str, Any]] = {}
+    if runs_path.exists():
+        for line in runs_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    rec = json.loads(line)
+                    if rec.get("financebench_id") and not rec.get("error"):
+                        existing_records[rec["financebench_id"]] = rec
+                except Exception:
+                    pass
+
+    pending_questions = [
+        q for q in questions if q.get("financebench_id") not in existing_records
+    ]
+
+    if existing_records:
+        logger.info(
+            "Resuming: found {} completed question run(s); executing {} remaining question(s)",
+            len(existing_records),
+            len(pending_questions),
+        )
 
     logger.info(
         "Running {} question(s) in parallel (agent={}, db={}, folder={}, embeddings={}, concurrency={})",
-        len(questions),
+        len(pending_questions),
         cfg.agent_llm,
         cfg.kg_db,
         cfg.folder_id,
@@ -374,20 +395,30 @@ def run_questions_flow(
         cfg.question_concurrency,
     )
 
-    futures = [
-        run_question_task.submit(
-            q,
-            llm=cfg.agent_llm,
-            db_path=cfg.kg_db,
-            folder_id=cfg.folder_id,
-            profile_name=cfg.agent_profile,
-            embeddings_id=cfg.embeddings,
-            runs_path=str(runs_path),
-            concurrency=cfg.question_concurrency,
-        )
+    if pending_questions:
+        futures = [
+            run_question_task.submit(
+                q,
+                llm=cfg.agent_llm,
+                db_path=cfg.kg_db,
+                folder_id=cfg.folder_id,
+                profile_name=cfg.agent_profile,
+                embeddings_id=cfg.embeddings,
+                runs_path=str(runs_path),
+                concurrency=cfg.question_concurrency,
+            )
+            for q in pending_questions
+        ]
+        new_records = [f.result() for f in futures]
+        for r in new_records:
+            if r.get("financebench_id"):
+                existing_records[r["financebench_id"]] = r
+
+    records = [
+        existing_records[q["financebench_id"]]
         for q in questions
+        if q.get("financebench_id") in existing_records
     ]
-    records = [f.result() for f in futures]
     with runs_path.open("w", encoding="utf-8") as fh:
         for r in records:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -400,7 +431,7 @@ def grade_flow(
     cfg: BenchConfig, runs: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     """Grade question runs in parallel using LLM-as-judge."""
-    from financebench.bench.grade import _summarize
+    from financebench.bench.grade import _summarize, generate_markdown_report
 
     runs_path = Path(cfg.runs)
     scores_path = Path(cfg.scores)
@@ -417,25 +448,55 @@ def grade_flow(
         ]
 
     scores_path.parent.mkdir(parents=True, exist_ok=True)
-    scores_path.write_text("", encoding="utf-8")
+    existing_scores: dict[str, dict[str, Any]] = {}
+    if scores_path.exists():
+        for line in scores_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    sc = json.loads(line)
+                    if sc.get("financebench_id") and not sc.get("error"):
+                        existing_scores[sc["financebench_id"]] = sc
+                except Exception:
+                    pass
+
+    pending_runs = [
+        r for r in runs if r.get("financebench_id") not in existing_scores
+    ]
+
+    if existing_scores:
+        logger.info(
+            "Resuming: found {} completed score(s); grading {} remaining run(s)",
+            len(existing_scores),
+            len(pending_runs),
+        )
 
     logger.info(
         "Grading {} run(s) in parallel with judge={} (concurrency={})",
-        len(runs),
+        len(pending_runs),
         cfg.judge_llm,
         cfg.judge_concurrency,
     )
 
-    futures = [
-        grade_run_task.submit(
-            run,
-            judge_llm=cfg.judge_llm,
-            scores_path=str(scores_path),
-            concurrency=cfg.judge_concurrency,
-        )
-        for run in runs
+    if pending_runs:
+        futures = [
+            grade_run_task.submit(
+                run,
+                judge_llm=cfg.judge_llm,
+                scores_path=str(scores_path),
+                concurrency=cfg.judge_concurrency,
+            )
+            for run in pending_runs
+        ]
+        new_scores = [f.result() for f in futures]
+        for s in new_scores:
+            if s.get("financebench_id"):
+                existing_scores[s["financebench_id"]] = s
+
+    scores = [
+        existing_scores[r["financebench_id"]]
+        for r in runs
+        if r.get("financebench_id") in existing_scores
     ]
-    scores = [f.result() for f in futures]
     with scores_path.open("w", encoding="utf-8") as fh:
         for s in scores:
             fh.write(json.dumps(s, ensure_ascii=False) + "\n")
@@ -444,7 +505,20 @@ def grade_flow(
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    logger.success("Grading complete → scores={}, summary={}", scores_path, summary)
+    report_path = generate_markdown_report(
+        scores,
+        summary,
+        profile_name=cfg.profile_name,
+        agent_llm=cfg.agent_llm,
+        judge_llm=cfg.judge_llm,
+    )
+
+    logger.success(
+        "Grading complete → scores={}, summary={}, report={}",
+        scores_path,
+        summary,
+        report_path,
+    )
     return summary
 
 

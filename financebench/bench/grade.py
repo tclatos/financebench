@@ -123,14 +123,63 @@ async def _grade_one(judge_llm_id: str, run: dict) -> dict:
     content = resp.content if isinstance(resp.content, str) else str(resp.content)
     try:
         verdict = _extract_json(content)
-        if "groundedness" not in verdict:
-            if "grounded" in verdict:
-                g_val = verdict.pop("grounded")
-                verdict["groundedness"] = "grounded" if g_val is True else "ungrounded"
+
+        # Normalize and validate correctness enum strictly
+        raw_corr = str(verdict.get("correctness", "")).lower().strip()
+        if raw_corr in ("correct", "exact", "true", "yes"):
+            correctness = "correct"
+        elif raw_corr in ("partial", "partially_correct", "partially correct"):
+            correctness = "partial"
+        elif raw_corr in ("incorrect", "false", "no", "wrong"):
+            correctness = "incorrect"
+        elif "partial" in raw_corr:
+            correctness = "partial"
+        elif "correct" in raw_corr:
+            correctness = "correct"
+        else:
+            raise ValueError(f"Invalid judge correctness value: {verdict.get('correctness')!r}")
+
+        # Normalize numeric_match
+        num_m = verdict.get("numeric_match")
+        if isinstance(num_m, str):
+            if num_m.lower() in ("true", "yes", "1"):
+                numeric_match: bool | None = True
+            elif num_m.lower() in ("false", "no", "0"):
+                numeric_match = False
             else:
-                verdict["groundedness"] = "grounded" if verdict.get("correctness") == "correct" else "partial"
+                numeric_match = None
+        elif isinstance(num_m, bool):
+            numeric_match = num_m
+        else:
+            numeric_match = None
+
+        # Normalize groundedness
+        raw_ground = str(
+            verdict.get("groundedness")
+            or verdict.get("grounded")
+            or ("grounded" if correctness == "correct" else "partial")
+        ).lower().strip()
+        if raw_ground in ("grounded", "true", "yes"):
+            groundedness = "grounded"
+        elif raw_ground in ("partial", "partially_grounded", "partially grounded"):
+            groundedness = "partial"
+        elif raw_ground in ("ungrounded", "false", "no"):
+            groundedness = "ungrounded"
+        else:
+            groundedness = "partial"
+
+        rationale = str(verdict.get("rationale") or "").strip()
+        if not rationale:
+            rationale = "(no rationale provided)"
+
+        parsed_verdict = {
+            "correctness": correctness,
+            "numeric_match": numeric_match,
+            "groundedness": groundedness,
+            "rationale": rationale,
+        }
     except Exception as exc:  # noqa: BLE101
-        verdict = {
+        parsed_verdict = {
             "correctness": "incorrect",
             "numeric_match": None,
             "groundedness": "ungrounded",
@@ -150,7 +199,7 @@ async def _grade_one(judge_llm_id: str, run: dict) -> dict:
         "output_tokens": run["output_tokens"],
         "error": run.get("error"),
         "judge_llm": judge_llm_id,
-        **verdict,
+        **parsed_verdict,
     }
 
 
@@ -211,6 +260,124 @@ def _summarize(scores: list[dict]) -> dict:
         "avg_input_tokens": round(sum(s.get("input_tokens", 0) for s in scores) / n),
         "avg_output_tokens": round(sum(s.get("output_tokens", 0) for s in scores) / n),
     }
+
+
+def generate_markdown_report(
+    scores: list[dict],
+    summary: dict,
+    *,
+    profile_name: str = "mistral_glm",
+    agent_llm: str = "",
+    judge_llm: str = "",
+    report_path: Path | None = None,
+) -> Path:
+    """Generate a markdown evaluation report from scores and summary."""
+    from collections import defaultdict
+    from datetime import datetime, timezone
+    from financebench.bench._env import REPORT_DIR
+
+    target_path = report_path or (REPORT_DIR / f"{profile_name}_report.md")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    n = summary.get("n", len(scores))
+    acc_exact = f"{summary.get('accuracy_correct', 0) * 100:.1f}%"
+    acc_lenient = f"{summary.get('accuracy_correct_or_partial', 0) * 100:.1f}%"
+    groundedness = f"{summary.get('groundedness_rate', 0) * 100:.1f}%"
+    num_match = (
+        f"{summary.get('numeric_match_rate', 0) * 100:.1f}%"
+        if summary.get("numeric_match_rate") is not None
+        else "N/A"
+    )
+
+    lines: list[str] = [
+        f"# FinanceBench Benchmark Report: `{profile_name}`",
+        "",
+        f"- **Date**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        f"- **Agent LLM**: `{agent_llm}`",
+        f"- **Judge LLM**: `{judge_llm}`",
+        f"- **Total Questions Evaluated**: {n}",
+        "",
+        "## Summary Metrics",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
+        f"| **Exact Correct** | {summary.get('correct', 0)} ({acc_exact}) |",
+        f"| **Correct or Partial** | {summary.get('correct', 0) + summary.get('partial', 0)} ({acc_lenient}) |",
+        f"| **Incorrect** | {summary.get('incorrect', 0)} ({summary.get('incorrect', 0) / max(1, n) * 100:.1f}%) |",
+        f"| **Groundedness Rate** | {summary.get('grounded', 0)} / {n} ({groundedness}) |",
+        f"| **Numeric Match Rate** | {num_match} ({summary.get('numeric_questions', 0)} numeric questions) |",
+        f"| **Avg Tool Calls / Question** | {summary.get('avg_tool_calls', 0)} |",
+        f"| **Avg Input Tokens / Question** | {summary.get('avg_input_tokens', 0):,} |",
+        f"| **Avg Output Tokens / Question** | {summary.get('avg_output_tokens', 0):,} |",
+        "",
+    ]
+
+    # Breakdown by document
+    by_doc: dict[str, list[dict]] = defaultdict(list)
+    for s in scores:
+        doc = s.get("doc_name") or "unknown"
+        by_doc[doc].append(s)
+
+    lines.extend([
+        "## Results by Document",
+        "",
+        "| Document | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
+        "|---|---|---|---|---|---|",
+    ])
+    for doc, doc_scores in sorted(by_doc.items()):
+        d_n = len(doc_scores)
+        d_c = sum(1 for s in doc_scores if s.get("correctness") == "correct")
+        d_p = sum(1 for s in doc_scores if s.get("correctness") == "partial")
+        d_i = sum(1 for s in doc_scores if s.get("correctness") == "incorrect")
+        d_rate = f"{(d_c + d_p) / max(1, d_n) * 100:.1f}%"
+        lines.append(f"| `{doc}` | {d_n} | {d_c} | {d_p} | {d_i} | {d_rate} |")
+
+    lines.append("")
+
+    # Breakdown by reasoning type
+    by_reasoning: dict[str, list[dict]] = defaultdict(list)
+    for s in scores:
+        r_type = s.get("question_reasoning") or s.get("question_type") or "general"
+        by_reasoning[r_type].append(s)
+
+    if len(by_reasoning) > 1:
+        lines.extend([
+            "## Results by Question Type / Reasoning",
+            "",
+            "| Category | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
+            "|---|---|---|---|---|---|",
+        ])
+        for cat, cat_scores in sorted(by_reasoning.items()):
+            c_n = len(cat_scores)
+            c_c = sum(1 for s in cat_scores if s.get("correctness") == "correct")
+            c_p = sum(1 for s in cat_scores if s.get("correctness") == "partial")
+            c_i = sum(1 for s in cat_scores if s.get("correctness") == "incorrect")
+            c_rate = f"{(c_c + c_p) / max(1, c_n) * 100:.1f}%"
+            lines.append(f"| {cat} | {c_n} | {c_c} | {c_p} | {c_i} | {c_rate} |")
+        lines.append("")
+
+    # Non-correct questions analysis
+    non_correct = [s for s in scores if s.get("correctness") in ("partial", "incorrect")]
+    if non_correct:
+        lines.extend([
+            "## Non-Perfect Questions Analysis",
+            "",
+        ])
+        for s in non_correct:
+            lines.extend([
+                f"### `{s.get('financebench_id')}` — {s.get('doc_name')} ({s.get('correctness', '').upper()})",
+                "",
+                f"- **Question**: {s.get('question')}",
+                f"- **Gold Answer**: {s.get('gold_answer')}",
+                f"- **Agent Answer**: {s.get('agent_answer')}",
+                f"- **Judge Rationale**: {s.get('rationale')}",
+                f"- **Numeric Match**: {s.get('numeric_match')}",
+                f"- **Groundedness**: {s.get('groundedness')}",
+                "",
+            ])
+
+    target_path.write_text("\n".join(lines), encoding="utf-8")
+    return target_path
 
 
 def main(argv: list[str] | None = None) -> int:

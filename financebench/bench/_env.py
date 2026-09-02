@@ -10,6 +10,7 @@ current working directory.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -33,10 +34,16 @@ DEFAULT_BUILD_LLM = "deepseek_v4flash@openrouter"
 
 
 def load_env() -> None:
-    """Load ``~/.env`` (idempotent) so secrets are present in ``os.environ``."""
+    """Load environment variables and ensure local hosts bypass proxy."""
     home_env = Path.home() / ".env"
     if home_env.exists():
         load_dotenv(home_env, override=False)
+
+    loopback_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+    for key in ("NO_PROXY", "no_proxy"):
+        current = os.environ.get(key, "")
+        existing = {h.strip() for h in current.split(",") if h.strip()}
+        os.environ[key] = ",".join(sorted(existing | loopback_hosts))
 
 
 def ensure_dirs() -> None:

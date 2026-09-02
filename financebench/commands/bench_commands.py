@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from genai_tk.cli.base import CliTopCommand
+from financebench.bench._env import load_env
 from financebench.bench.run import (
     ALL_STEPS,
     list_bench_profiles,
@@ -165,6 +166,7 @@ class BenchCommands(CliTopCommand):
                     )
                     raise typer.Exit(1)
 
+            load_env()
             cfg_p = Path(config_path) if config_path else None
             try:
                 cfg = load_bench_profile(profile_name=profile, config_path=cfg_p)
