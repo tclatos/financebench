@@ -27,28 +27,15 @@ Operating across an enterprise corpus of **84 complex SEC filings** (~30 public 
 
 ---
 
-## Technology Stack & Agentic Architecture
+## Agentic Architecture
 
 The solution couples advanced document intelligence with an autonomous **LangChain DeepAgent** runtime, purpose-built financial domain skills, and a multi-model LLM pipeline:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             TECHNOLOGY STACK                                │
-│                                                                             │
-│  [1] Document Ingestion & OCR:     Mistral OCR (high-fidelity tables & MD)  │
-│  [2] Document Summary & Outline:   DeepSeek V4 Flash (TOC & section models) │
-│  [3] Knowledge Graph Storage:      Ladybug Document Graph (Kùzu Backend)    │
-│  [4] Hybrid Retrieval:             Native BM25 FTS + Qwen3-0.6B Embeddings  │
-│  [5] Core Autonomous Agent:        LangChain DeepAgent powered by GLM 5.2   │
-│  [6] Injected Domain Skills:       Graph Navigation & Financial Accounting  │
-│  [7] Independent Evaluation Judge: DeepSeek V4 Pro (0813)                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
 
 ### 1. High-Fidelity OCR & Document Graph Ingestion
 - **OCR Engine (Mistral OCR)**: Converts complex, multi-column PDF filings into clean, structured Markdown, preserving multi-page financial tables, notes, and footnote markers.
 - **Outline & Summarization LLM (DeepSeek V4 Flash)**: Extracts structural hierarchies, chapter summaries, and content-addressed Table of Contents (TOC) mappings during graph compilation.
-- **Hierarchical Document Graph (Ladybug Graph over Kùzu)**: Ingests documents into an embedded graph database maintaining exact parent-child section relationships and table contexts.
+- **Hierarchical Document Graph (LadybugDB Graph Database)**: Ingests documents into an embedded graph database maintaining exact parent-child section relationships and table contexts.
 - **Dual Retrieval Engine**: Combines native **BM25 full-text keyword search** for exact accounting terminology with **Qwen3-0.6B vector embeddings** for thematic concept retrieval.
 
 ### 2. LangChain DeepAgent with Specialized Domain Skills
