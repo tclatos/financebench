@@ -313,6 +313,25 @@ def build_document_graph(
         result = ingest_document_graph(
             backend, factory, force=force, retrieval_config=retrieval_config
         )
+        # Verify graph integrity: assert every Document has associated MarkdownSection nodes
+        docs_df = backend.conn.execute("MATCH (d:Document) RETURN d.name, d.content_hash").get_as_df()
+        orphan_docs: list[str] = []
+        for _, row in docs_df.iterrows():
+            c_hash = row["d.content_hash"]
+            sec_count = backend.conn.execute(
+                f"MATCH (s:MarkdownSection) WHERE s.section_id STARTS WITH '{c_hash}' RETURN count(s)"
+            ).get_as_df().iloc[0, 0]
+            if sec_count == 0:
+                orphan_docs.append(str(row["d.name"]))
+        if orphan_docs:
+            logger.error(
+                "Graph integrity validation failed: {} document(s) have 0 sections in graph: {}",
+                len(orphan_docs),
+                orphan_docs,
+            )
+            result.warnings.append(f"Orphaned documents with 0 sections: {orphan_docs}")
+        else:
+            logger.info("Graph integrity verified: all {} document(s) have non-zero sections", len(docs_df))
     finally:
         backend.close()
 

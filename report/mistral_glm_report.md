@@ -1,6 +1,6 @@
 # FinanceBench Benchmark Report: `mistral_glm`
 
-- **Date**: 2026-09-02 05:00:28 UTC
+- **Date**: 2026-09-02 06:56:34 UTC
 - **Agent LLM**: `glm_5.2@openrouter`
 - **Judge LLM**: `DeepSeek-V4-Pro-0813@openrouter`
 - **Total Questions Evaluated**: 150
@@ -9,28 +9,28 @@
 
 | Metric | Value |
 |---|---|
-| **Exact Correct** | 126 (84.0%) |
-| **Correct or Partial** | 132 (88.0%) |
-| **Incorrect** | 17 (11.3%) |
-| **Groundedness Rate** | 132 / 150 (88.0%) |
-| **Numeric Match Rate** | 86.7% (105 numeric questions) |
-| **Avg Tool Calls / Question** | 5.31 |
-| **Avg Input Tokens / Question** | 83,417 |
-| **Avg Output Tokens / Question** | 1,938 |
+| **Exact Correct** | 137 (91.3%) |
+| **Correct or Partial** | 144 (96.0%) |
+| **Incorrect** | 6 (4.0%) |
+| **Groundedness Rate** | 145 / 150 (96.7%) |
+| **Numeric Match Rate** | 92.6% (108 numeric questions) |
+| **Avg Tool Calls / Question** | 6.11 |
+| **Avg Input Tokens / Question** | 104,039 |
+| **Avg Output Tokens / Question** | 2,782 |
 
 ## Results by Document
 
 | Document | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |
 |---|---|---|---|---|---|
-| `3M_2018_10K` | 2 | 0 | 0 | 2 | 0.0% |
+| `3M_2018_10K` | 2 | 2 | 0 | 0 | 100.0% |
 | `3M_2022_10K` | 3 | 3 | 0 | 0 | 100.0% |
-| `3M_2023Q2_10Q` | 3 | 2 | 0 | 1 | 66.7% |
+| `3M_2023Q2_10Q` | 3 | 3 | 0 | 0 | 100.0% |
 | `ACTIVISIONBLIZZARD_2019_10K` | 2 | 2 | 0 | 0 | 100.0% |
 | `ADOBE_2015_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `ADOBE_2016_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `ADOBE_2017_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `ADOBE_2022_10K` | 2 | 2 | 0 | 0 | 100.0% |
-| `AES_2022_10K` | 3 | 2 | 0 | 1 | 66.7% |
+| `AES_2022_10K` | 3 | 3 | 0 | 0 | 100.0% |
 | `AMAZON_2017_10K` | 2 | 2 | 0 | 0 | 100.0% |
 | `AMAZON_2019_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `AMCOR_2020_10K` | 1 | 1 | 0 | 0 | 100.0% |
@@ -39,15 +39,15 @@
 | `AMCOR_2023Q4_EARNINGS` | 2 | 2 | 0 | 0 | 100.0% |
 | `AMCOR_2023_10K` | 4 | 4 | 0 | 0 | 100.0% |
 | `AMD_2015_10K` | 1 | 1 | 0 | 0 | 100.0% |
-| `AMD_2022_10K` | 7 | 5 | 0 | 1 | 71.4% |
+| `AMD_2022_10K` | 7 | 7 | 0 | 0 | 100.0% |
 | `AMERICANEXPRESS_2022_10K` | 7 | 7 | 0 | 0 | 100.0% |
 | `AMERICANWATERWORKS_2020_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `AMERICANWATERWORKS_2021_10K` | 1 | 1 | 0 | 0 | 100.0% |
-| `AMERICANWATERWORKS_2022_10K` | 1 | 0 | 0 | 1 | 0.0% |
+| `AMERICANWATERWORKS_2022_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `BESTBUY_2017_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `BESTBUY_2019_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `BESTBUY_2023_10K` | 3 | 3 | 0 | 0 | 100.0% |
-| `BESTBUY_2024Q2_10Q` | 3 | 2 | 0 | 1 | 66.7% |
+| `BESTBUY_2024Q2_10Q` | 3 | 3 | 0 | 0 | 100.0% |
 | `BLOCK_2016_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `BLOCK_2020_10K` | 2 | 2 | 0 | 0 | 100.0% |
 | `BOEING_2018_10K` | 1 | 1 | 0 | 0 | 100.0% |
@@ -57,7 +57,7 @@
 | `COCACOLA_2022_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `CORNING_2020_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `CORNING_2021_10K` | 1 | 1 | 0 | 0 | 100.0% |
-| `CORNING_2022_10K` | 2 | 1 | 0 | 1 | 50.0% |
+| `CORNING_2022_10K` | 2 | 1 | 1 | 0 | 100.0% |
 | `COSTCO_2021_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `CVSHEALTH_2018_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `CVSHEALTH_2022_10K` | 3 | 2 | 1 | 0 | 100.0% |
@@ -71,7 +71,7 @@
 | `JOHNSON_JOHNSON_2023Q2_EARNINGS` | 1 | 1 | 0 | 0 | 100.0% |
 | `JOHNSON_JOHNSON_2023_8K_dated-2023-08-30` | 3 | 3 | 0 | 0 | 100.0% |
 | `JPMORGAN_2021Q1_10Q` | 2 | 1 | 1 | 0 | 100.0% |
-| `JPMORGAN_2022Q2_10Q` | 1 | 0 | 0 | 1 | 0.0% |
+| `JPMORGAN_2022Q2_10Q` | 1 | 1 | 0 | 0 | 100.0% |
 | `JPMORGAN_2022_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `JPMORGAN_2023Q2_10Q` | 1 | 1 | 0 | 0 | 100.0% |
 | `KRAFTHEINZ_2019_10K` | 1 | 1 | 0 | 0 | 100.0% |
@@ -97,12 +97,12 @@
 | `PEPSICO_2023Q1_EARNINGS` | 2 | 2 | 0 | 0 | 100.0% |
 | `PEPSICO_2023_8K_dated-2023-05-05` | 1 | 1 | 0 | 0 | 100.0% |
 | `PEPSICO_2023_8K_dated-2023-05-30` | 2 | 2 | 0 | 0 | 100.0% |
-| `PFIZER_2021_10K` | 3 | 2 | 0 | 1 | 66.7% |
+| `PFIZER_2021_10K` | 3 | 3 | 0 | 0 | 100.0% |
 | `Pfizer_2023Q2_10Q` | 3 | 1 | 0 | 2 | 33.3% |
 | `ULTABEAUTY_2023Q4_EARNINGS` | 4 | 3 | 0 | 1 | 75.0% |
 | `ULTABEAUTY_2023_10K` | 2 | 2 | 0 | 0 | 100.0% |
 | `VERIZON_2021_10K` | 2 | 2 | 0 | 0 | 100.0% |
-| `VERIZON_2022_10K` | 3 | 2 | 0 | 1 | 66.7% |
+| `VERIZON_2022_10K` | 3 | 3 | 0 | 0 | 100.0% |
 | `WALMART_2018_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `WALMART_2019_10K` | 1 | 1 | 0 | 0 | 100.0% |
 | `WALMART_2020_10K` | 1 | 1 | 0 | 0 | 100.0% |
@@ -111,36 +111,58 @@
 
 | Category | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |
 |---|---|---|---|---|---|
-| Information extraction | 31 | 28 | 0 | 3 | 90.3% |
+| Information extraction | 31 | 30 | 0 | 1 | 96.8% |
 | Information extraction OR Logical reasoning | 1 | 1 | 0 | 0 | 100.0% |
 | Information extraction OR Logical reasoning OR | 1 | 1 | 0 | 0 | 100.0% |
 | Logical reasoning (based on numerical reasoning) | 5 | 4 | 1 | 0 | 100.0% |
-| Logical reasoning (based on numerical reasoning) OR Logical reasoning | 5 | 3 | 0 | 2 | 60.0% |
+| Logical reasoning (based on numerical reasoning) OR Logical reasoning | 5 | 5 | 0 | 0 | 100.0% |
 | Logical reasoning (based on numerical reasoning) OR Numerical reasoning OR Logical reasoning | 4 | 4 | 0 | 0 | 100.0% |
-| Numerical reasoning | 43 | 42 | 0 | 0 | 97.7% |
-| Numerical reasoning OR Logical reasoning | 6 | 2 | 1 | 3 | 50.0% |
+| Numerical reasoning | 43 | 43 | 0 | 0 | 100.0% |
+| Numerical reasoning OR Logical reasoning | 6 | 4 | 2 | 0 | 100.0% |
 | Numerical reasoning OR information extraction | 4 | 4 | 0 | 0 | 100.0% |
-| novel-generated | 50 | 37 | 4 | 9 | 82.0% |
+| novel-generated | 50 | 41 | 4 | 5 | 90.0% |
 
 ## Non-Perfect Questions Analysis
 
-### `financebench_id_00005` — CORNING_2022_10K (INCORRECT)
+### `financebench_id_00005` — CORNING_2022_10K (PARTIAL)
 
 - **Question**: Does Corning have positive working capital based on FY2022 data? If working capital is not a useful or relevant metric for this company, then please state that and explain why.
 - **Gold Answer**: Yes. Corning had a positive working capital amount of $831 million by FY 2022 close. This answer considers only operating current assets and current liabilities that were clearly shown in the balance sheet.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent's response is an execution error and does not answer the question about Corning's working capital.
-- **Numeric Match**: False
-- **Groundedness**: ungrounded
+- **Agent Answer**: ## Answer
 
-### `financebench_id_00070` — AMERICANWATERWORKS_2022_10K (INCORRECT)
+**Yes, Corning has positive working capital in FY2022.** Working capital is a relevant and useful metric for Corning, as it is a manufacturing company (glass, ceramics, optical fiber, display technologies) with conventional inventory, receivables, and payables — not a financial institution where the metric would be meaningless.
 
-- **Question**: Does American Water Works have positive working capital based on FY2022 data? If working capital is not a useful or relevant metric for this company, then please state that and explain why.
-- **Gold Answer**: No, American Water Works had negative working capital of -$1561M in FY 2022.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent did not provide a substantive answer about American Water Works' working capital, instead returning an execution error message.
+### Calculation (FY2022, as of December 31, 2022)
+
+| Line item | Amount ($ millions) |
+|---|---|
+| Total current assets | $7,453 |
+| Total current liabilities | $5,175 |
+| **Working capital** | **$2,278** |
+
+**Working Capital = Current Assets − Current Liabilities = $7,453M − $5,175M = $2,278M**
+
+### Supporting detail (from the Consolidated Balance Sheet)
+
+Current assets ($7,453M) comprised:
+- Cash and cash equivalents: $1,671M
+- Trade accounts receivable, net: $1,721M
+- Inventories: $2,904M
+- Other current assets: $1,157M
+
+Current liabilities ($5,175M) comprised:
+- Current portion of long-term debt and short-term borrowings: $224M
+- Accounts payable: $1,804M
+- Other accrued liabilities: $3,147M
+
+### Conclusion
+
+Corning's FY2022 working capital is **positive at approximately $2,278 million**, indicating the company's short-term assets comfortably exceed its short-term obligations. The metric is meaningful here because Corning is an industrial manufacturer with a standard operating cycle (raw materials → inventory → receivables → cash), so the current asset/current liability relationship is a valid indicator of short-term liquidity.
+
+*Citation: CORNING_2022_10K_pdf.md [cb6bb56af29ce129::183] — Consolidated Balance Sheets, December 31, 2022.*
+- **Judge Rationale**: The agent correctly concludes Corning had positive working capital, but its $2,278 million standard current-assets-minus-current-liabilities figure does not match the gold answer's $831 million operating working capital figure.
 - **Numeric Match**: False
-- **Groundedness**: ungrounded
+- **Groundedness**: grounded
 
 ### `financebench_id_00080` — PAYPAL_2022_10K (PARTIAL)
 
@@ -186,59 +208,32 @@ Even after stripping out the customer-fund pass-throughs, working capital remain
 - **Numeric Match**: False
 - **Groundedness**: grounded
 
-### `financebench_id_00216` — VERIZON_2022_10K (INCORRECT)
-
-- **Question**: Does Verizon have a reasonably healthy liquidity profile based on its quick ratio for FY 2022? If the quick ratio is not relevant to measure liquidity, please state that and explain why.
-- **Gold Answer**: No. The quick ratio was approximately 0.54 for Verizon. It indicated that Verizon does not have a healthy liquidity profile.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error and provides no substantive response to the question about Verizon's quick ratio or liquidity.
-- **Numeric Match**: False
-- **Groundedness**: ungrounded
-
-### `financebench_id_00222` — AMD_2022_10K (INCORRECT)
-
-- **Question**: Does AMD have a reasonably healthy liquidity profile based on its quick ratio for FY22? If the quick ratio is not relevant to measure liquidity, please state that and explain why.
-- **Gold Answer**: Yes. The quick ratio is 1.57, calculated as (cash and cash equivalents+Short term investments+Accounts receivable, net+receivables from related parties)/ (current liabilities).
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error message and provides no substantive answer about AMD's liquidity or quick ratio.
-- **Numeric Match**: False
-- **Groundedness**: ungrounded
-
 ### `financebench_id_00283` — Pfizer_2023Q2_10Q (INCORRECT)
 
 - **Question**: How much does Pfizer expect to pay to spin off Upjohn in the future in USD million?
 - **Gold Answer**: 77.78
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error message and provides no substantive answer to the question.
+- **Agent Answer**: I'll research this question about Pfizer's Upjohn spin-off costs. Let me start by exploring the document graph.I found Pfizer documents. The Upjohn spin-off was completed in 2020, so the 2021 10-K would discuss it. Let me explore the Pfizer document structure.I see the "Discontinued Operations" section (id 113) and "Restructuring Charges" sections. Let me search for "Upjohn" and check the key sections.The Discontinued Operations section points to Note 2B. Let me read that section and search more specifically for Upjohn/Viatris transaction details.The "B. Divestitures" section appears to just have a header. Let me check adjacent sections and the business development section that may contain the Upjohn details.I found a key detail — a $277 million payment to Viatris in 2021. Let me look at the adjacent section for more complete context about future expected payments.Let me search more specifically and look at the restructuring/other costs sections that may detail Upjohn spin-off costs.I found the key section "Upjohn Separation and Combination with Mylan" (id 188). Let me read it along with the related discontinued operations components section.I found the answer. Let me verify the key detail in section 189 about the future payment related to the Upjohn spin-off.
+
+## Answer
+
+**Pfizer expected to pay $277 million to Viatris in the future related to the Upjohn spin-off.**
+
+### Supporting Evidence
+
+According to Pfizer's 2021 Form 10-K (Note 2B. Divestitures), in connection with the Upjohn Separation and Combination with Mylan (which formed Viatris, completed November 16, 2020), Pfizer and Viatris entered into various separation agreements. The filing states:
+
+> "...a **$277 million payment to Viatris made in 2021** pursuant to terms of the separation agreement, which is reported in *Other financing activities, net*, and **was recorded as a payable to Viatris in *Other current liabilities* as of December 31, 2020**."
+
+`[654f9494117719b6::189]` (PFIZER_2021_10K_pdf.md)
+
+### Context
+- The Upjohn spin-off was completed on November 16, 2020, as an all-stock Reverse Morris Trust transaction combining the Upjohn Business with Mylan to form Viatris `[654f9494117719b6::188]`.
+- As of December 31, 2020, Pfizer had recorded a **$277 million payable to Viatris** in Other current liabilities, representing the future cash payment expected to be made under the separation agreement. This payment was subsequently made in 2021 `[654f9494117719b6::189]`.
+
+**Answer: $277 million**
+- **Judge Rationale**: The agent cites a $277 million payable to Viatris from the 2021 10-K, whereas the gold answer is $77.78 million in remaining Upjohn separation costs, so the amounts do not match.
 - **Numeric Match**: False
-- **Groundedness**: ungrounded
-
-### `financebench_id_00288` — BESTBUY_2024Q2_10Q (INCORRECT)
-
-- **Question**: Was there any drop in Cash & Cash equivalents between FY 2023 and Q2 of FY2024?
-- **Gold Answer**: Yes, there was a decline of ~42% between FY2023 and Q2 of FY 2024.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent's response is an execution error message and provides no substantive answer to the question.
-- **Numeric Match**: None
-- **Groundedness**: ungrounded
-
-### `financebench_id_00302` — PFIZER_2021_10K (INCORRECT)
-
-- **Question**: Did Pfizer grow its PPNE between FY20 and FY21?
-- **Gold Answer**: Yes, change in PPNE was positive year over year
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error and does not provide any substantive answer to whether Pfizer grew PPNE between FY20 and FY21.
-- **Numeric Match**: None
-- **Groundedness**: ungrounded
-
-### `financebench_id_00394` — JPMORGAN_2022Q2_10Q (INCORRECT)
-
-- **Question**: In 2022 Q2, which of JPM's business segments had the highest net income?
-- **Gold Answer**: Corporate & Investment Bank. Its net income was $3725 million.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error and does not identify the segment or net income figure.
-- **Numeric Match**: False
-- **Groundedness**: ungrounded
+- **Groundedness**: grounded
 
 ### `financebench_id_00494` — BOEING_2022_10K (PARTIAL)
 
@@ -280,15 +275,6 @@ Concurrently, the **777X-9 production remained paused through 2023**, and the **
 - **Judge Rationale**: The agent correctly identifies 737 and 787 production increases, but incorrectly states 777X production remained paused through 2023 rather than resuming in 2023, missing one of the three programs in the gold answer.
 - **Numeric Match**: None
 - **Groundedness**: partial
-
-### `financebench_id_00540` — AES_2022_10K (INCORRECT)
-
-- **Question**: Roughly how many times has AES Corporation sold its inventory in FY2022? Calculate inventory turnover ratio for the FY2022; if conventional inventory management is not meaningful for the company then state that and explain why.
-- **Gold Answer**: AES has converted inventory 9.5 times in FY 2022.
-- **Agent Answer**: Execution error: already exists: genai-tk-atof subscriber already exists
-- **Judge Rationale**: The agent answer is an execution error and provides no substantive answer to the inventory turnover question.
-- **Numeric Match**: None
-- **Groundedness**: ungrounded
 
 ### `financebench_id_00585` — BOEING_2022_10K (PARTIAL)
 
@@ -487,15 +473,6 @@ There is no "Restructuring costs" (or similarly titled) line item directly outli
 - **Numeric Match**: False
 - **Groundedness**: grounded
 
-### `financebench_id_01858` — 3M_2023Q2_10Q (INCORRECT)
-
-- **Question**: Does 3M maintain a stable trend of dividend distribution?
-- **Gold Answer**: Yes, not only they distribute the dividends on a routine basis, 3M has also been increasing the per share dividend for consecutive 65 years
-- **Agent Answer**: I'll examine 3M's filings to assess dividend distribution trends. Let me start with the 2022 10-K (most recent annual filing) and search for dividend information.Let me map the 3M 2022 10-K document structure to find dividend-related sections.I found the key section. Let me read the "Dividends Paid to Shareholders" section (108) and the "Issuer Purchases of Equity Securities" section (37) which typically contains dividend per share data.I have strong evidence from the 2022 10-K. Let me also check the 2018 10-K to confirm the longer-term trend and the cash flow statement for dividend dollar amounts.Let me check the 2018 10-K for the longer-term dividend trend to confirm stability over time.Let me find the 2018 10-K document and check its dividend information for the longer-term trend.
-- **Judge Rationale**: The agent answer only describes search steps and does not state a conclusion or answer the question about dividend stability.
-- **Numeric Match**: None
-- **Groundedness**: ungrounded
-
 ### `financebench_id_01911` — MGMRESORTS_2022Q4_EARNINGS (INCORRECT)
 
 - **Question**: What was MGM's interest coverage ratio using FY2022 Adjusted EBIT as the numerator and annual Interest Expense as the denominator?
@@ -663,22 +640,4 @@ As of Q2 2023, Pfizer's notable corporate actions were **acquisitions/divestitur
 As of Q2 2023, Pfizer was **not spinning off any large business segments**. Its two major separations — Upjohn/Viatris (2020) and the Consumer Healthcare JV/Haleon demerger (July 2022) — were already completed, and the Q2 2023 filing only reflects residual post-close adjustments and ongoing separation cost wind-down from those prior transactions.
 - **Judge Rationale**: The agent says Pfizer was not spinning off any large business segments as of Q2 2023, directly contradicting the gold answer that it was spinning off Upjohn, which the gold evidence supports as an ongoing separation.
 - **Numeric Match**: None
-- **Groundedness**: ungrounded
-
-### `financebench_id_03029` — 3M_2018_10K (INCORRECT)
-
-- **Question**: What is the FY2018 capital expenditure amount (in USD millions) for 3M? Give a response to the question by relying on the details shown in the cash flow statement.
-- **Gold Answer**: $1577.00
-- **Agent Answer**: I'll help you find 3M's FY2018 capital expenditure from the cash flow statement. Let me start by exploring the document graph.I found the 3M 2018 10-K. Let me explore its structure to find the cash flow statement.Let me try searching for the cash flow statement directly.Let me list the documents to get the correct document ID for the 3M 2018 10-K.The document ID is confirmed. Let me retry getting the document's table of contents.Let me search within the folder for the cash flow statement sections specifically.The search isn't returning 3M-specific sections. Let me try to access the 3M 2018 10-K document's TOC using the hash ID directly.
-- **Judge Rationale**: The agent did not provide a capital expenditure amount, only described its search process.
-- **Numeric Match**: False
-- **Groundedness**: ungrounded
-
-### `financebench_id_04672` — 3M_2018_10K (INCORRECT)
-
-- **Question**: Assume that you are a public equities analyst. Answer the following question by primarily using information that is shown in the balance sheet: what is the year end FY2018 net PPNE for 3M? Answer in USD billions.
-- **Gold Answer**: $8.70
-- **Agent Answer**: 
-- **Judge Rationale**: The agent provided no answer, so it does not match the gold answer of $8.70 billion.
-- **Numeric Match**: False
 - **Groundedness**: ungrounded

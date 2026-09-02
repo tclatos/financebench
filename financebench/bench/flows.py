@@ -245,29 +245,8 @@ def grade_run_task(
 
     sem = _get_semaphore(_JUDGE_SEMAPHORES, concurrency)
 
-    try:
-        with sem:
-            score = asyncio.run(_grade_one(judge_llm, run))
-    except Exception as exc:
-        logger.warning("[{}] Grading exception: {}; returning fallback verdict", run["financebench_id"], exc)
-        score = {
-            "financebench_id": run["financebench_id"],
-            "doc_name": run["doc_name"],
-            "question_type": run.get("question_type"),
-            "question_reasoning": run.get("question_reasoning"),
-            "question": run["question"],
-            "gold_answer": run.get("gold_answer", ""),
-            "agent_answer": run.get("agent_answer", ""),
-            "n_tool_calls": run.get("n_tool_calls", 0),
-            "input_tokens": run.get("input_tokens", 0),
-            "output_tokens": run.get("output_tokens", 0),
-            "error": str(exc),
-            "judge_llm": judge_llm,
-            "correctness": "incorrect",
-            "numeric_match": None,
-            "groundedness": "ungrounded",
-            "rationale": f"Grading error: {exc}",
-        }
+    with sem:
+        score = asyncio.run(_grade_one(judge_llm, run))
 
     if scores_path:
         with _SCORES_WRITE_LOCK:
@@ -487,7 +466,32 @@ def grade_flow(
             )
             for run in pending_runs
         ]
-        new_scores = [f.result() for f in futures]
+        new_scores: list[dict[str, Any]] = []
+        for f, run in zip(futures, pending_runs, strict=False):
+            try:
+                s = f.result()
+                new_scores.append(s)
+            except Exception as exc:
+                logger.error("[{}] All grading retries failed: {}", run["financebench_id"], exc)
+                fallback = {
+                    "financebench_id": run["financebench_id"],
+                    "doc_name": run["doc_name"],
+                    "question_type": run.get("question_type"),
+                    "question_reasoning": run.get("question_reasoning"),
+                    "question": run["question"],
+                    "gold_answer": run.get("gold_answer", ""),
+                    "agent_answer": run.get("agent_answer", ""),
+                    "n_tool_calls": run.get("n_tool_calls", 0),
+                    "input_tokens": run.get("input_tokens", 0),
+                    "output_tokens": run.get("output_tokens", 0),
+                    "error": str(exc),
+                    "judge_llm": cfg.judge_llm,
+                    "correctness": "incorrect",
+                    "numeric_match": None,
+                    "groundedness": "ungrounded",
+                    "rationale": f"Grading error: {exc}",
+                }
+                new_scores.append(fallback)
         for s in new_scores:
             if s.get("financebench_id"):
                 existing_scores[s["financebench_id"]] = s

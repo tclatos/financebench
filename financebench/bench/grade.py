@@ -27,13 +27,25 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Literal
 
 from loguru import logger
+from pydantic import BaseModel
 
 from financebench.bench._env import DEFAULT_JUDGE_LLM, FB_DIR, load_env
 from financebench.bench.run_questions import RUNS_PATH
 
 SCORES_PATH = FB_DIR / "scores.jsonl"
+
+
+class JudgeVerdict(BaseModel):
+    """Structured verdict returned by the LLM-as-judge."""
+
+    correctness: Literal["correct", "partial", "incorrect"]
+    numeric_match: bool | None = None
+    groundedness: Literal["grounded", "partial", "ungrounded"] = "partial"
+    rationale: str = ""
+
 
 _JUDGE_SYSTEM = """\
 You are a strict-but-fair grader for FinanceBench, a financial QA benchmark.
@@ -110,7 +122,80 @@ def _extract_json(text: str) -> dict:
     return json.loads(candidate)
 
 
-async def _grade_one(judge_llm_id: str, run: dict) -> dict:
+def _parse_verdict(content: str) -> JudgeVerdict:
+    """Parse and strictly validate the judge JSON output into a JudgeVerdict."""
+    raw_dict = _extract_json(content)
+
+    # Normalize correctness
+    raw_corr = str(raw_dict.get("correctness", "")).lower().strip()
+    if raw_corr in ("correct", "exact", "true", "yes"):
+        correctness: Literal["correct", "partial", "incorrect"] = "correct"
+    elif raw_corr in ("partial", "partially_correct", "partially correct"):
+        correctness = "partial"
+    elif raw_corr in ("incorrect", "false", "no", "wrong"):
+        correctness = "incorrect"
+    elif "partial" in raw_corr:
+        correctness = "partial"
+    elif "correct" in raw_corr and raw_corr != "correctness":
+        correctness = "correct"
+    else:
+        # If the model emitted a malformed or schema-echoed key, try to infer from rationale or fallback
+        rat = str(raw_dict.get("rationale", "")).lower()
+        if "correct" in rat and "incorrect" not in rat:
+            correctness = "correct"
+        elif "partial" in rat:
+            correctness = "partial"
+        else:
+            correctness = "incorrect"
+
+    # Normalize numeric_match
+    num_m = raw_dict.get("numeric_match")
+    if isinstance(num_m, str):
+        if num_m.lower() in ("true", "yes", "1"):
+            numeric_match: bool | None = True
+        elif num_m.lower() in ("false", "no", "0"):
+            numeric_match = False
+        else:
+            numeric_match = None
+    elif isinstance(num_m, bool):
+        numeric_match = num_m
+    else:
+        numeric_match = None
+
+    # Normalize groundedness
+    raw_ground = str(
+        raw_dict.get("groundedness")
+        or raw_dict.get("grounded")
+        or ("grounded" if correctness == "correct" else "partial")
+    ).lower().strip()
+    if raw_ground in ("grounded", "true", "yes"):
+        groundedness: Literal["grounded", "partial", "ungrounded"] = "grounded"
+    elif raw_ground in ("partial", "partially_grounded", "partially grounded"):
+        groundedness = "partial"
+    elif raw_ground in ("ungrounded", "false", "no"):
+        groundedness = "ungrounded"
+    else:
+        groundedness = "partial"
+
+    rationale = str(raw_dict.get("rationale") or "").strip()
+    if not rationale:
+        rationale = "(no rationale provided)"
+
+    return JudgeVerdict(
+        correctness=correctness,
+        numeric_match=numeric_match,
+        groundedness=groundedness,
+        rationale=rationale,
+    )
+
+
+async def _grade_one(
+    judge_llm_id: str,
+    run: dict,
+    *,
+    max_retries: int = 3,
+    retry_delay: float = 2.0,
+) -> dict:
     """Grade one run with the judge LLM and return the score record."""
     from genai_tk.core.factories.llm_factory import get_llm
 
@@ -119,65 +204,36 @@ async def _grade_one(judge_llm_id: str, run: dict) -> dict:
         {"role": "system", "content": _JUDGE_SYSTEM},
         {"role": "user", "content": _judge_prompt(run)},
     ]
-    resp = await judge.ainvoke(messages)
-    content = resp.content if isinstance(resp.content, str) else str(resp.content)
-    try:
-        verdict = _extract_json(content)
 
-        # Normalize and validate correctness enum strictly
-        raw_corr = str(verdict.get("correctness", "")).lower().strip()
-        if raw_corr in ("correct", "exact", "true", "yes"):
-            correctness = "correct"
-        elif raw_corr in ("partial", "partially_correct", "partially correct"):
-            correctness = "partial"
-        elif raw_corr in ("incorrect", "false", "no", "wrong"):
-            correctness = "incorrect"
-        elif "partial" in raw_corr:
-            correctness = "partial"
-        elif "correct" in raw_corr:
-            correctness = "correct"
-        else:
-            raise ValueError(f"Invalid judge correctness value: {verdict.get('correctness')!r}")
-
-        # Normalize numeric_match
-        num_m = verdict.get("numeric_match")
-        if isinstance(num_m, str):
-            if num_m.lower() in ("true", "yes", "1"):
-                numeric_match: bool | None = True
-            elif num_m.lower() in ("false", "no", "0"):
-                numeric_match = False
+    content: str = ""
+    for attempt in range(max_retries):
+        try:
+            resp = await judge.ainvoke(messages)
+            content = resp.content if isinstance(resp.content, str) else str(resp.content)
+            break
+        except Exception as exc:
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "[{}] Judge LLM invocation error (attempt {}/{}): {}; retrying in {}s...",
+                    run.get("financebench_id"),
+                    attempt + 1,
+                    max_retries,
+                    exc,
+                    retry_delay * (attempt + 1),
+                )
+                await asyncio.sleep(retry_delay * (attempt + 1))
             else:
-                numeric_match = None
-        elif isinstance(num_m, bool):
-            numeric_match = num_m
-        else:
-            numeric_match = None
+                logger.error(
+                    "[{}] Judge LLM invocation failed after {} attempts: {}",
+                    run.get("financebench_id"),
+                    max_retries,
+                    exc,
+                )
+                raise
 
-        # Normalize groundedness
-        raw_ground = str(
-            verdict.get("groundedness")
-            or verdict.get("grounded")
-            or ("grounded" if correctness == "correct" else "partial")
-        ).lower().strip()
-        if raw_ground in ("grounded", "true", "yes"):
-            groundedness = "grounded"
-        elif raw_ground in ("partial", "partially_grounded", "partially grounded"):
-            groundedness = "partial"
-        elif raw_ground in ("ungrounded", "false", "no"):
-            groundedness = "ungrounded"
-        else:
-            groundedness = "partial"
-
-        rationale = str(verdict.get("rationale") or "").strip()
-        if not rationale:
-            rationale = "(no rationale provided)"
-
-        parsed_verdict = {
-            "correctness": correctness,
-            "numeric_match": numeric_match,
-            "groundedness": groundedness,
-            "rationale": rationale,
-        }
+    try:
+        verdict = _parse_verdict(content)
+        parsed_verdict = verdict.model_dump()
     except Exception as exc:  # noqa: BLE101
         parsed_verdict = {
             "correctness": "incorrect",
