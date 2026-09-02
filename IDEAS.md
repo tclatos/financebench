@@ -1,14 +1,29 @@
-# Ready for all bench ! 
 
-The benchmark has been run on 30 selected files. We want to run it now on all the files. But first, we can implement some  recommended improvement.
-Read the report/PHASE6.md, and plan implementing all recommended improvement. 
+# OfficeQA_pro
 
-In addition : 
-- Change fallback if Mistral OCR fail => select anydoc  (shouls always be prefered to markitdown)
+We want to adapt our FinanceBench work on the OfficeQA PRO benchmark.
+It is described here: 
+https://huggingface.co/datasets/databricks/officeqa 
 
-- add in the bench.yaml file the ability to select trace monitoring method (langchain, langfuse, ...). Select None for now.
+We will try to use the transformed dataset, to avoid OCR costs, and taking advantage that we have now a tree_parser that can takes files without Markdown marks.
+It is available https://huggingface.co/datasets/databricks/officeqa/tree/main/treasury_bulletins_parsed/transformed 
 
-- 
+The Hugging Face API key is in the .env. 
+I've already accepted the conditions to access the dataset.
+
+Here the first phase I suggest :
+
+
+1/ create a /home/tcl/prj/officeqa folder and fork https://github.com/tclatos/financebench there
+
+2/ rename everything looking at 'financebench' to 'officeqa'. Do a quick test that 'cli --help' list available commands without error
+
+3/ Adapt code to use question datasets and files from the HF databricks/officeqa repo
+
+4/ Take one file (any) and see if our tree_parsing algo (in /home/tcl/prj/genai-graph/genai_graph/kg/document_graph/tree_parser.py) works well, ie that the document is decomposed in several sections that makes sense and are correctly inserted in the graph db. Update code if required (but try not to break it - it works correctly for financeweb...).
+If you assess that it can work that way, stop here ( We will the OCR approach).
+
+5/ Do not calculate embedding, BM25 index etc for now. It will next phases.
 
 
 
@@ -19,19 +34,10 @@ Review the first iterations to achieve good results at FinanceBench. I want to g
 - Analyse directly the recorded trajectories: /home/tcl/prj/financebench/data/trajectories 
 - Analyse code and skills (genai-graph and financebech) 
 Make your own critical analysis of what has been done, and what could be improved.
-Progress has notably been done when moving away from a pure solution without embeddings. It's not a major concern because I'm not a purist and having embeddings does not impact design too much and could be useful anyway, but I would like to understand how other solutions claim very good results with just doc tree:   
+  
 - https://github.com/NanoNets/nanoindex/ 
 - https://github.com/VectifyAI/Mafin2.5-FinanceBench  (based on https://github.com/VectifyAI/PageIndex).  
 Is  there other reason than using stronger LLM ? 
-
-I also wonder why the search tool is so used. Is the table of content not enough informative (could we improve the process to pass from Markdow doc to sections ? the summaries ? ) ? or the skill not providing correct approach  ? 
-
-
-
-Also there has been many changes in the code. Have a look at it and see if it could be simplified, made more generic etc. 
-(I want notably to test later our approach with the OfficeQA Pro benchmark. )
-
-
 
 
 

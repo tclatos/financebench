@@ -14,8 +14,6 @@ paths:
 
 # Graph Database Configuration - Ladybug (Kuzu) database for the Document Graph.
 # Backs the financebench_build workflow and the docgraph agent (resolve_db_path).
-graph_db:
-  default: ${paths.data_root}/kg/financebench_tree.db
 
 nlp:
   default_language: en

@@ -15,10 +15,14 @@ paths:
   scores: ${paths.data_root}/financebench/{profile}/scores.jsonl
   scores_summary: ${paths.data_root}/financebench/{profile}/scores_summary.json
 
+graph_db:   
+  default: ${paths.kg_db}   # used by 'cli docgraph' commands
+
+
 bench_profiles:
   mistral_glm:
-    description: "GLM 5.2 agent with Mistral OCR (medium profile) and DeepSeek V4 Pro judge"
-    markdownize_profile: medium
+    description: "GLM 5.2 agent with Mistral OCR and DeepSeek V4 Pro judge"
+    markdownize_profile: best
 
     # Trace monitoring method: null (None / disabled) | "langchain" (LangSmith) | "langfuse" | "local" | "otel"
     monitoring: null
@@ -63,23 +67,21 @@ markdownize_profiles:
       - pathspec: "**/*"
         converter: anydoc
 
-  medium:
+  best:
     rules:
       - pathspec: "**/*.{xlsx,xls,ods}"
         converter: messy_xls
       - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf}"
-        converter: via_pdf
-      - pathspec: "**/*.pdf"
         converter: mistral_ocr
       - pathspec: "**/*"
         converter: anydoc
 
-  best:
+  medium:
     rules:
       - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf,xlsx,xls,ods}"
         converter: via_pdf
       - pathspec: "**/*.pdf"
-        converter: mistral_ocr
+        converter: lighton_ocr
       - pathspec: "**/*"
         converter: anydoc
 
