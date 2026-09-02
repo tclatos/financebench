@@ -1,13 +1,10 @@
 # FinanceBench Executive Evaluation & Capability Synthesis
 
-*Report Prepared by: **Gemini 3.7 Flash***  
-*Target Audience: Executive & Engineering Management*
-
 ---
 
 ## Executive Summary
 
-This report synthesizes the enterprise readiness, analytical accuracy, and operational economics of our **Financial Deep Agent Architecture** evaluated against the industry-standard **FinanceBench** benchmark. 
+This report synthesizes the readiness, analytical accuracy, and operational economics of our **Financial Deep Agent Architecture** evaluated against the industry-standard **FinanceBench** benchmark. 
 
 Operating across an enterprise corpus of **84 complex SEC filings** (~30 public corporations across 10-K, 10-Q, 8-K, and Earnings Releases) and **150 rigorous financial questions**, the system demonstrates institutional-grade performance:
 
@@ -36,7 +33,7 @@ The solution couples advanced document intelligence with an autonomous **LangCha
 - **OCR Engine (Mistral OCR)**: Converts complex, multi-column PDF filings into clean, structured Markdown, preserving multi-page financial tables, notes, and footnote markers.
 - **Outline & Summarization LLM (DeepSeek V4 Flash)**: Extracts structural hierarchies, chapter summaries, and content-addressed Table of Contents (TOC) mappings during graph compilation.
 - **Hierarchical Document Graph (LadybugDB Graph Database)**: Ingests documents into an embedded graph database maintaining exact parent-child section relationships and table contexts.
-- **Dual Retrieval Engine**: Combines native **BM25 full-text keyword search** for exact accounting terminology with **Qwen3-0.6B vector embeddings** for thematic concept retrieval.
+- **Dual Retrieval Engine**: Combines native **BM25 full-text keyword search** for exact accounting terminology with **vector embeddings** for thematic concept retrieval.
 
 ### 2. LangChain DeepAgent with Specialized Domain Skills
 The analytical reasoning is orchestrated by a **LangChain DeepAgent** powered by **GLM 5.2**, configured with autonomous multi-step planning, filesystem-backed context, and dynamic skill injection:
@@ -107,17 +104,6 @@ The agent exhibits an efficient compute and token consumption profile, demonstra
 1. **Dynamic Reasoning Budget**: Direct fact retrieval (8-K / 10-K) concludes in ~5 tool calls, while complex multi-segment quarterly reconciliations (10-Q) dynamically expand to ~14 tool calls to ensure calculation accuracy.
 2. **Graph-Driven Token Efficiency**: Navigating the Document Graph rather than passing raw multi-hundred-page text windows constrains average input consumption to ~104k tokens per query.
 3. **High Automation ROI**: The 96.0% comprehensive accuracy level delivers substantial time and cost savings for financial analysts, equity researchers, and risk compliance teams.
-
----
-
-## Strategic Recommendations
-
-1. **Enterprise Deployment for SEC Workflows**:
-   - The architecture is ready for enterprise rollout across M&A due diligence, investment screening, and credit risk evaluation.
-2. **Dual-Metric Standard Reporting**:
-   - Incorporate dual-reporting in user interfaces (displaying both GAAP Standard and Operating Working Capital) to accommodate varied analyst preferences.
-3. **Automated Portfolio Entity Routing**:
-   - Maintain automated entity disambiguation for multi-filing portfolios when corporate names are omitted from queries.
 
 ---
 
