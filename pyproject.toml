@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "baml-py>=0.223.0",
-    "genai-tk",
+    "genai-tk[harnessing]",
     "genai_graph",
     "datasets>=2.20",
     "pandas>=2.2",
@@ -21,12 +21,6 @@ genai-tk = { git = "https://github.com/tclatos/genai-tk", branch = "main" }
 genai_graph = { path = "../genai-graph", editable = true }
 [tool.uv]
 package = true
-
-
-# Forward some of genai-tk's optional extras — install with: uv sync --extra <name>
-[project.optional-dependencies]
-harnessing = ["genai-tk[harnessing]"]
-nlp        = ["genai-tk[nlp]"]
 
 
 [build-system]

@@ -2,28 +2,6 @@
 #
 # Contains the default FinanceBench QA Analyst deep agent profile.
 
-agent_defaults:
-  type: react
-  llm: null  # null = use the global default LLM from config
-  middlewares:
-    - class: genai_tk.agents.langchain.middleware.rich_middleware.RichToolCallMiddleware
-    - class: genai_tk.agents.langchain.middleware.deduplicate_middleware.DeduplicateToolCallsMiddleware
-      tools: ["get_document_toc", "get_folder_toc", "list_documents"]
-      mode: "stub"
-    - class: genai_graph.agent.middleware.map_before_search.MapBeforeSearchMiddleware
-      max_consecutive: 3
-  checkpointer:
-    type: none
-  backend:
-    type: none
-  enable_planning: true
-  enable_file_system: true
-  skills:
-    directories:
-      - ${paths.project}/skills/custom
-      - ${paths.project}/skills/community
-  default_profile: default
-
 agents:
   # Deep agent that answers FinanceBench questions by navigating the Document Graph.
   default:
@@ -81,6 +59,21 @@ agents:
     tools: []
     skill_directories:
       - ${paths.project}/skills/custom
+      - ${paths.project}/skills/community
+    middlewares:
+      - class: genai_tk.agents.langchain.middleware.rich_middleware.RichToolCallMiddleware
+      - class: genai_tk.agents.langchain.middleware.observation_truncation_middleware.ObservationTruncationMiddleware
+        max_chars: 14000
+        head_ratio: 0.8
+      - class: genai_tk.agents.langchain.middleware.deduplicate_middleware.DeduplicateToolCallsMiddleware
+        tools: ["get_document_toc", "get_folder_toc", "list_documents"]
+        mode: "stub"
+      - class: genai_graph.agent.middleware.map_before_search.MapBeforeSearchMiddleware
+        max_consecutive: 3
+    checkpointer:
+      type: none
+    backend:
+      type: none
     enable_planning: true
     enable_file_system: true
     recursion_limit: 160
