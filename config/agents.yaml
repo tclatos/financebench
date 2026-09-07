@@ -65,6 +65,10 @@ agents:
       - ${paths.project}/skills/custom
       - ${paths.project}/skills/community
     middlewares:
+      - class: genai_tk.agents.langchain.middleware.empty_response_retry.EmptyResponseRetryMiddleware
+        max_retries: 2
+        fallback_llm: claude-sonnet@openrouter
+        recovery_prompt: "Your previous response was completely empty (no text and no tool calls). Please continue your analysis and provide your response, emit the next required tool call, or deliver your final answer."
       - class: genai_tk.agents.langchain.middleware.rich_middleware.RichToolCallMiddleware
       - class: genai_tk.agents.langchain.middleware.observation_truncation_middleware.ObservationTruncationMiddleware
         max_chars: 14000
