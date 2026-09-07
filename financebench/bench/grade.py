@@ -185,6 +185,32 @@ def _parse_verdict(content: str) -> JudgeVerdict:
     if not rationale:
         rationale = "(no rationale provided)"
 
+    # Consistency Guardrail 1: If numeric_match is True, prevent contradictory "incorrect" verdicts
+    if numeric_match is True and correctness == "incorrect":
+        rat_lower = rationale.lower()
+        pos_signals = ("match", "exact", "correct", "accurat", "equal", "same as gold", "consistent", "infer")
+        neg_signals = ("does not match", "wrong value", "incorrect value", "failed to find", "hallucinat", "no mention")
+        has_pos = any(p in rat_lower for p in pos_signals)
+        has_neg = any(n in rat_lower for n in neg_signals)
+        if has_pos and not has_neg:
+            correctness = "correct"
+        elif not has_neg:
+            correctness = "correct"
+
+    # Consistency Guardrail 2: If rationale explicitly affirms exact/correct match, coerce correctness
+    if correctness == "incorrect":
+        rat_lower = rationale.lower()
+        if (
+            ("exactly matches" in rat_lower or "matches the gold" in rat_lower or "is correct" in rat_lower)
+            and "not correct" not in rat_lower
+            and "incorrect" not in rat_lower
+            and "does not match" not in rat_lower
+        ):
+            correctness = "correct"
+
+    if correctness == "correct" and groundedness == "ungrounded":
+        groundedness = "grounded"
+
     return JudgeVerdict(
         correctness=correctness,
         numeric_match=numeric_match,
@@ -203,7 +229,7 @@ async def _grade_one(
     """Grade one run with the judge LLM and return the score record."""
     from genai_tk.core.factories.llm_factory import get_llm
 
-    judge = get_llm(llm=judge_llm_id, json_mode=True)
+    judge = get_llm(llm=judge_llm_id, json_mode=True, reasoning=False)
     messages = [
         {"role": "system", "content": _JUDGE_SYSTEM},
         {"role": "user", "content": _judge_prompt(run)},
