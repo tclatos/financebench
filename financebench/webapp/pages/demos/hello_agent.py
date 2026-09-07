@@ -7,13 +7,12 @@ Customize or copy this file as a starting point for your own agent pages.
 import uuid
 
 import streamlit as st
+from genai_tk.core.factories.llm_factory import get_llm
+from genai_tk.webapp.ui_components.llm_selector import llm_selector_widget
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from streamlit import session_state as sss
-
-from genai_tk.core.factories.llm_factory import get_llm
-from genai_tk.webapp.ui_components.llm_selector import llm_selector_widget
 
 st.set_page_config(page_title="Hello Agent", page_icon="🤖", layout="wide")
 st.title("🤖 Hello Agent")
@@ -37,9 +36,7 @@ def calculator(expression: str) -> str:
 
 # ── Session state ───────────────────────────────────────────────────────
 if "hello_messages" not in sss:
-    sss.hello_messages = [
-        AIMessage(content="Hello! I can answer questions and do math. Try me!")
-    ]
+    sss.hello_messages = [AIMessage(content="Hello! I can answer questions and do math. Try me!")]
 
 # ── Display chat history ────────────────────────────────────────────────
 for msg in sss.hello_messages:

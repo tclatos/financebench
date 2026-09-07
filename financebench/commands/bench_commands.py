@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from genai_tk.cli.base import CliTopCommand
 from rich.console import Console
 from rich.table import Table
 
-from genai_tk.cli.base import CliTopCommand
 from financebench.bench._env import load_env
 from financebench.bench.run import (
     ALL_STEPS,
@@ -34,18 +34,14 @@ class BenchCommands(CliTopCommand):
         def list_profiles(
             config_path: Annotated[
                 str | None,
-                typer.Option(
-                    "-c", "--config", help="Path to bench YAML configuration file"
-                ),
+                typer.Option("-c", "--config", help="Path to bench YAML configuration file"),
             ] = None,
         ) -> None:
             """List configured benchmark run profiles."""
             cfg_p = Path(config_path) if config_path else None
             profiles = list_bench_profiles(cfg_p)
             if not profiles:
-                console.print(
-                    "[yellow]No benchmark profiles found in configuration.[/yellow]"
-                )
+                console.print("[yellow]No benchmark profiles found in configuration.[/yellow]")
                 return
 
             table = Table(title="FinanceBench Run Profiles")
@@ -111,9 +107,7 @@ class BenchCommands(CliTopCommand):
             ] = None,
             step: Annotated[
                 str | None,
-                typer.Option(
-                    "--step", help="Run only this one step (fetch, build, run, grade)"
-                ),
+                typer.Option("--step", help="Run only this one step (fetch, build, run, grade)"),
             ] = None,
             skip: Annotated[
                 list[str] | None,
@@ -137,9 +131,7 @@ class BenchCommands(CliTopCommand):
             ] = False,
             config_path: Annotated[
                 str | None,
-                typer.Option(
-                    "-c", "--config", help="Path to bench YAML configuration file"
-                ),
+                typer.Option("-c", "--config", help="Path to bench YAML configuration file"),
             ] = None,
         ) -> None:
             """Execute a benchmark evaluation run.
@@ -153,17 +145,13 @@ class BenchCommands(CliTopCommand):
                 cli bench run --step run -n 1
             """
             if step and step not in ALL_STEPS:
-                console.print(
-                    f"[red]Error:[/red] Invalid step '{step}'. Choose from: {ALL_STEPS}"
-                )
+                console.print(f"[red]Error:[/red] Invalid step '{step}'. Choose from: {ALL_STEPS}")
                 raise typer.Exit(1)
 
             if skip:
                 invalid_skips = [s for s in skip if s not in ALL_STEPS]
                 if invalid_skips:
-                    console.print(
-                        f"[red]Error:[/red] Invalid skip step(s) {invalid_skips}. Choose from: {ALL_STEPS}"
-                    )
+                    console.print(f"[red]Error:[/red] Invalid skip step(s) {invalid_skips}. Choose from: {ALL_STEPS}")
                     raise typer.Exit(1)
 
             load_env()

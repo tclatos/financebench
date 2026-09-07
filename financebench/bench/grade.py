@@ -163,11 +163,15 @@ def _parse_verdict(content: str) -> JudgeVerdict:
         numeric_match = None
 
     # Normalize groundedness
-    raw_ground = str(
-        raw_dict.get("groundedness")
-        or raw_dict.get("grounded")
-        or ("grounded" if correctness == "correct" else "partial")
-    ).lower().strip()
+    raw_ground = (
+        str(
+            raw_dict.get("groundedness")
+            or raw_dict.get("grounded")
+            or ("grounded" if correctness == "correct" else "partial")
+        )
+        .lower()
+        .strip()
+    )
     if raw_ground in ("grounded", "true", "yes"):
         groundedness: Literal["grounded", "partial", "ungrounded"] = "grounded"
     elif raw_ground in ("partial", "partially_grounded", "partially grounded"):
@@ -281,9 +285,7 @@ async def _grade_all(
             "  → {} (numeric={}) [{}]",
             score["correctness"],
             score["numeric_match"],
-            (score["rationale"][:90] + "…")
-            if len(score["rationale"]) > 90
-            else score["rationale"],
+            (score["rationale"][:90] + "…") if len(score["rationale"]) > 90 else score["rationale"],
         )
     return scores
 
@@ -296,9 +298,7 @@ def _summarize(scores: list[dict]) -> dict:
     correct = sum(1 for s in scores if s.get("correctness") == "correct")
     partial = sum(1 for s in scores if s.get("correctness") == "partial")
     incorrect = sum(1 for s in scores if s.get("correctness") == "incorrect")
-    grounded = sum(
-        1 for s in scores if s.get("groundedness") == "grounded" or s.get("grounded") is True
-    )
+    grounded = sum(1 for s in scores if s.get("groundedness") == "grounded" or s.get("grounded") is True)
     numeric = [s for s in scores if s.get("numeric_match") is not None]
     numeric_ok = sum(1 for s in numeric if s.get("numeric_match") is True)
     return {
@@ -330,6 +330,7 @@ def generate_markdown_report(
     """Generate a markdown evaluation report from scores and summary."""
     from collections import defaultdict
     from datetime import datetime, timezone
+
     from financebench.bench._env import REPORT_DIR
 
     target_path = report_path or (REPORT_DIR / f"{profile_name}_report.md")
@@ -340,9 +341,7 @@ def generate_markdown_report(
     acc_lenient = f"{summary.get('accuracy_correct_or_partial', 0) * 100:.1f}%"
     groundedness = f"{summary.get('groundedness_rate', 0) * 100:.1f}%"
     num_match = (
-        f"{summary.get('numeric_match_rate', 0) * 100:.1f}%"
-        if summary.get("numeric_match_rate") is not None
-        else "N/A"
+        f"{summary.get('numeric_match_rate', 0) * 100:.1f}%" if summary.get("numeric_match_rate") is not None else "N/A"
     )
 
     lines: list[str] = [
@@ -374,12 +373,14 @@ def generate_markdown_report(
         doc = s.get("doc_name") or "unknown"
         by_doc[doc].append(s)
 
-    lines.extend([
-        "## Results by Document",
-        "",
-        "| Document | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
-        "|---|---|---|---|---|---|",
-    ])
+    lines.extend(
+        [
+            "## Results by Document",
+            "",
+            "| Document | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
+            "|---|---|---|---|---|---|",
+        ]
+    )
     for doc, doc_scores in sorted(by_doc.items()):
         d_n = len(doc_scores)
         d_c = sum(1 for s in doc_scores if s.get("correctness") == "correct")
@@ -397,12 +398,14 @@ def generate_markdown_report(
         by_reasoning[r_type].append(s)
 
     if len(by_reasoning) > 1:
-        lines.extend([
-            "## Results by Question Type / Reasoning",
-            "",
-            "| Category | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
-            "|---|---|---|---|---|---|",
-        ])
+        lines.extend(
+            [
+                "## Results by Question Type / Reasoning",
+                "",
+                "| Category | Questions | Correct | Partial | Incorrect | Accuracy (Lenient) |",
+                "|---|---|---|---|---|---|",
+            ]
+        )
         for cat, cat_scores in sorted(by_reasoning.items()):
             c_n = len(cat_scores)
             c_c = sum(1 for s in cat_scores if s.get("correctness") == "correct")
@@ -415,22 +418,26 @@ def generate_markdown_report(
     # Non-correct questions analysis
     non_correct = [s for s in scores if s.get("correctness") in ("partial", "incorrect")]
     if non_correct:
-        lines.extend([
-            "## Non-Perfect Questions Analysis",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Non-Perfect Questions Analysis",
+                "",
+            ]
+        )
         for s in non_correct:
-            lines.extend([
-                f"### `{s.get('financebench_id')}` — {s.get('doc_name')} ({s.get('correctness', '').upper()})",
-                "",
-                f"- **Question**: {s.get('question')}",
-                f"- **Gold Answer**: {s.get('gold_answer')}",
-                f"- **Agent Answer**: {s.get('agent_answer')}",
-                f"- **Judge Rationale**: {s.get('rationale')}",
-                f"- **Numeric Match**: {s.get('numeric_match')}",
-                f"- **Groundedness**: {s.get('groundedness')}",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"### `{s.get('financebench_id')}` — {s.get('doc_name')} ({s.get('correctness', '').upper()})",
+                    "",
+                    f"- **Question**: {s.get('question')}",
+                    f"- **Gold Answer**: {s.get('gold_answer')}",
+                    f"- **Agent Answer**: {s.get('agent_answer')}",
+                    f"- **Judge Rationale**: {s.get('rationale')}",
+                    f"- **Numeric Match**: {s.get('numeric_match')}",
+                    f"- **Groundedness**: {s.get('groundedness')}",
+                    "",
+                ]
+            )
 
     target_path.write_text("\n".join(lines), encoding="utf-8")
     return target_path
@@ -438,21 +445,13 @@ def generate_markdown_report(
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Grade FinanceBench runs with an LLM-as-judge."
-    )
-    parser.add_argument(
-        "--judge", default=DEFAULT_JUDGE_LLM, help="LLM identifier for the judge."
-    )
+    parser = argparse.ArgumentParser(description="Grade FinanceBench runs with an LLM-as-judge.")
+    parser.add_argument("--judge", default=DEFAULT_JUDGE_LLM, help="LLM identifier for the judge.")
     parser.add_argument("--runs", default=str(RUNS_PATH), help="Path to runs.jsonl.")
     args = parser.parse_args(argv)
 
     load_env()
-    runs = [
-        json.loads(line)
-        for line in Path(args.runs).read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    runs = [json.loads(line) for line in Path(args.runs).read_text(encoding="utf-8").splitlines() if line.strip()]
     logger.info("Grading {} run(s) with judge={}", len(runs), args.judge)
 
     SCORES_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -460,9 +459,7 @@ def main(argv: list[str] | None = None) -> int:
 
     scores = asyncio.run(_grade_all(runs, args.judge))
     summary = _summarize(scores)
-    (FB_DIR / "scores_summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
+    (FB_DIR / "scores_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     print(f"scores={SCORES_PATH}")
     print(f"summary={json.dumps(summary)}")

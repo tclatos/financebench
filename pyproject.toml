@@ -29,3 +29,42 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["financebench"]
+
+[tool.ruff]
+builtins = ["ic", "debug"]
+line-length = 120
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E", # Pycodestyle errors
+    "F", # Pyflakes errors
+    "I", # isort rules
+    "W", # Pycodestyle warnings
+    "B", # Bugbear
+    "C", # Better comprehensions
+    "PIE",
+    "PD", # Pandas
+    "FURB",
+]
+ignore = [
+    "E501",   # Line too long (we use 120 chars)
+    "W291",   # Trailing whitespace
+    "B006",   # Mutable default args
+    "C901",   # Complex function
+    "COM812", # Trailing comma conflicts
+    "ISC001", # Implicit string concat conflicts
+]
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+

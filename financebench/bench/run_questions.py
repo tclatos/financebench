@@ -73,9 +73,7 @@ async def _run_one(harness: object, q: dict, llm: str) -> dict:
         elif isinstance(event, ToolCallEvent):
             tool_calls.append({"tool": event.tool_name, "args": event.args})
         elif isinstance(event, ToolResultEvent):
-            tool_results.append(
-                {"tool": event.tool_name, "content": (event.content or "")[:1500]}
-            )
+            tool_results.append({"tool": event.tool_name, "content": (event.content or "")[:1500]})
         elif isinstance(event, UsageEvent):
             input_tokens += event.input_tokens
             output_tokens += event.output_tokens
@@ -124,16 +122,13 @@ async def _run_all(
     *runs_path* overrides where JSONL rows are appended (default ``RUNS_PATH``).
     *embeddings_id* enables the hybrid (vector + BM25) ``search_sections`` mode.
     """
-    from genai_tk.agents.harness.profiles import load_langchain_profiles
-
     from genai_graph.agent import create_docgraph_agent
+    from genai_tk.agents.harness.profiles import load_langchain_profiles
 
     out_path = runs_path or RUNS_PATH
     profiles = load_langchain_profiles()
     if profile_name not in profiles:
-        raise SystemExit(
-            f"Agent profile {profile_name!r} not found. Available: {sorted(profiles)}"
-        )
+        raise SystemExit(f"Agent profile {profile_name!r} not found. Available: {sorted(profiles)}")
     profile = profiles[profile_name]
 
     logger.info(
@@ -173,9 +168,7 @@ async def _run_all(
                 record["n_tool_calls"],
                 record["input_tokens"],
                 record["output_tokens"],
-                (record["agent_answer"][:90] + "…")
-                if len(record["agent_answer"]) > 90
-                else record["agent_answer"],
+                (record["agent_answer"][:90] + "…") if len(record["agent_answer"]) > 90 else record["agent_answer"],
             )
     finally:
         await harness.aclose()
@@ -184,18 +177,10 @@ async def _run_all(
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Run FinanceBench questions through the docgraph agent."
-    )
-    parser.add_argument(
-        "--llm", default=DEFAULT_AGENT_LLM, help="LLM identifier for the agent."
-    )
-    parser.add_argument(
-        "--db", default=str(KG_DB), help="Ladybug Document Graph DB path."
-    )
-    parser.add_argument(
-        "--limit", type=int, default=None, help="Run only the first N questions."
-    )
+    parser = argparse.ArgumentParser(description="Run FinanceBench questions through the docgraph agent.")
+    parser.add_argument("--llm", default=DEFAULT_AGENT_LLM, help="LLM identifier for the agent.")
+    parser.add_argument("--db", default=str(KG_DB), help="Ladybug Document Graph DB path.")
+    parser.add_argument("--limit", type=int, default=None, help="Run only the first N questions.")
     parser.add_argument(
         "--questions",
         default=str(QUESTIONS_PATH),

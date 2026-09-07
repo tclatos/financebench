@@ -102,9 +102,7 @@ def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
             converter = ConverterFactory.create(converter_name)
             text = asyncio.run(converter.convert(pdf_path))
             if text and text.strip():
-                logger.success(
-                    "{} conversion completed for {}", converter_name, pdf_path.name
-                )
+                logger.success("{} conversion completed for {}", converter_name, pdf_path.name)
                 return text
             logger.warning(
                 "Converter {} returned no text for {} (attempt {}/{})",
@@ -132,9 +130,7 @@ def _convert_pdf(pdf_path: Path, markdownize_profile: str = "medium") -> str:
             anydoc_conv = ConverterFactory.create("anydoc")
             text = asyncio.run(anydoc_conv.convert(pdf_path))
             if text and text.strip():
-                logger.success(
-                    "anydoc fallback conversion completed for {}", pdf_path.name
-                )
+                logger.success("anydoc fallback conversion completed for {}", pdf_path.name)
                 return text
             logger.warning("anydoc returned empty text for {}", pdf_path.name)
         except Exception as exc:  # noqa: BLE101
@@ -194,15 +190,11 @@ def markdownize_target(
     )
     text = _convert_pdf(pdf_path, markdownize_profile=markdownize_profile)
     _write_markdown(md_path, pdf_path, text)
-    logger.success(
-        "OCR markdown written: {} ({} bytes)", md_path, md_path.stat().st_size
-    )
+    logger.success("OCR markdown written: {} ({} bytes)", md_path, md_path.stat().st_size)
     return md_path
 
 
-def copy_markdown_to_project(
-    md_path: Path, *, markdown_dir: Path | None = None
-) -> Path:
+def copy_markdown_to_project(md_path: Path, *, markdown_dir: Path | None = None) -> Path:
     """Copy *md_path* into the project markdown dir for graph ingestion.
 
     *markdown_dir* defaults to ``MARKDOWN_DIR`` so the standalone CLI keeps
@@ -274,9 +266,7 @@ def build_document_graph(
 
     retrieval_config: RetrievalConfig | None = None
     if embeddings_id or fts:
-        retrieval_config = RetrievalConfig(
-            embeddings_id=embeddings_id, fts=fts, chunk_size_tokens=chunk_size_tokens
-        )
+        retrieval_config = RetrievalConfig(embeddings_id=embeddings_id, fts=fts, chunk_size_tokens=chunk_size_tokens)
     logger.info(
         "Building Document Graph: sources={} db={} force={} llm={} embeddings={} fts={}",
         md_base,
@@ -314,17 +304,19 @@ def build_document_graph(
                 files_degraded,
                 stats.llm_calls,
             )
-        result = ingest_document_graph(
-            backend, factory, force=force, retrieval_config=retrieval_config
-        )
+        result = ingest_document_graph(backend, factory, force=force, retrieval_config=retrieval_config)
         # Verify graph integrity: assert every Document has associated MarkdownSection nodes
         docs_df = backend.conn.execute("MATCH (d:Document) RETURN d.name, d.content_hash").get_as_df()
         orphan_docs: list[str] = []
         for _, row in docs_df.iterrows():
             c_hash = row["d.content_hash"]
-            sec_count = backend.conn.execute(
-                f"MATCH (s:MarkdownSection) WHERE s.section_id STARTS WITH '{c_hash}' RETURN count(s)"
-            ).get_as_df().iloc[0, 0]
+            sec_count = (
+                backend.conn.execute(
+                    f"MATCH (s:MarkdownSection) WHERE s.section_id STARTS WITH '{c_hash}' RETURN count(s)"
+                )
+                .get_as_df()
+                .iloc[0, 0]
+            )
             if sec_count == 0:
                 orphan_docs.append(str(row["d.name"]))
         if orphan_docs:
@@ -362,15 +354,9 @@ def build_document_graph(
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="OCR the target PDF and build the Document Graph."
-    )
-    parser.add_argument(
-        "--doc", default=None, help="doc_name (default: selected target)."
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Re-OCR and rebuild the graph."
-    )
+    parser = argparse.ArgumentParser(description="OCR the target PDF and build the Document Graph.")
+    parser.add_argument("--doc", default=None, help="doc_name (default: selected target).")
+    parser.add_argument("--force", action="store_true", help="Re-OCR and rebuild the graph.")
     parser.add_argument(
         "--skip-ocr",
         action="store_true",
@@ -440,9 +426,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         md_path = ONEDRIVE_MARKDOWN_DIR / f"{doc_name}{MD_FILENAME_SUFFIX}"
         if not md_path.exists():
-            raise SystemExit(
-                f"Markdown not found at {md_path}; run without --skip-ocr first."
-            )
+            raise SystemExit(f"Markdown not found at {md_path}; run without --skip-ocr first.")
 
     copy_markdown_to_project(md_path)
     result = build_document_graph(

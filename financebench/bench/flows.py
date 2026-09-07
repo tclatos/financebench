@@ -154,9 +154,9 @@ def run_question_task(
     concurrency: int = 10,
 ) -> dict[str, Any]:
     """Execute one question against the Document Graph deep agent and record trajectory."""
+    from genai_graph.agent import create_docgraph_agent
     from genai_tk.agents.harness.profiles import load_langchain_profiles
 
-    from genai_graph.agent import create_docgraph_agent
     from financebench.bench.run_questions import _run_one
 
     sem = _get_semaphore(_QUESTION_SEMAPHORES, concurrency)
@@ -164,9 +164,7 @@ def run_question_task(
     async def _execute() -> dict[str, Any]:
         profiles = load_langchain_profiles()
         if profile_name not in profiles:
-            raise KeyError(
-                f"Agent profile '{profile_name}' not found. Available: {sorted(profiles)}"
-            )
+            raise KeyError(f"Agent profile '{profile_name}' not found. Available: {sorted(profiles)}")
         profile = profiles[profile_name]
         harness = create_docgraph_agent(
             profile,
@@ -333,9 +331,7 @@ def build_graph_flow(cfg: BenchConfig) -> dict[str, Any]:
 
 
 @flow(name="financebench-run-questions")
-def run_questions_flow(
-    cfg: BenchConfig, questions: list[dict[str, Any]] | None = None
-) -> list[dict[str, Any]]:
+def run_questions_flow(cfg: BenchConfig, questions: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Run questions in parallel through the docgraph agent."""
     from financebench.bench.load_dataset import load_financebench, write_questions
 
@@ -361,9 +357,7 @@ def run_questions_flow(
                 except Exception:
                     pass
 
-    pending_questions = [
-        q for q in questions if q.get("financebench_id") not in existing_records
-    ]
+    pending_questions = [q for q in questions if q.get("financebench_id") not in existing_records]
 
     if existing_records:
         logger.info(
@@ -402,9 +396,7 @@ def run_questions_flow(
                 existing_records[r["financebench_id"]] = r
 
     records = [
-        existing_records[q["financebench_id"]]
-        for q in questions
-        if q.get("financebench_id") in existing_records
+        existing_records[q["financebench_id"]] for q in questions if q.get("financebench_id") in existing_records
     ]
     with runs_path.open("w", encoding="utf-8") as fh:
         for r in records:
@@ -414,9 +406,7 @@ def run_questions_flow(
 
 
 @flow(name="financebench-grade")
-def grade_flow(
-    cfg: BenchConfig, runs: list[dict[str, Any]] | None = None
-) -> dict[str, Any]:
+def grade_flow(cfg: BenchConfig, runs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Grade question runs in parallel using LLM-as-judge."""
     from financebench.bench.grade import _summarize, generate_markdown_report
 
@@ -428,11 +418,7 @@ def grade_flow(
         if not runs_path.exists():
             logger.warning("Runs file {} does not exist. Skipping grade.", runs_path)
             return {}
-        runs = [
-            json.loads(line)
-            for line in runs_path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        runs = [json.loads(line) for line in runs_path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
     scores_path.parent.mkdir(parents=True, exist_ok=True)
     existing_scores: dict[str, dict[str, Any]] = {}
@@ -446,9 +432,7 @@ def grade_flow(
                 except Exception:
                     pass
 
-    pending_runs = [
-        r for r in runs if r.get("financebench_id") not in existing_scores
-    ]
+    pending_runs = [r for r in runs if r.get("financebench_id") not in existing_scores]
 
     if existing_scores:
         logger.info(
@@ -504,11 +488,7 @@ def grade_flow(
             if s.get("financebench_id"):
                 existing_scores[s["financebench_id"]] = s
 
-    scores = [
-        existing_scores[r["financebench_id"]]
-        for r in runs
-        if r.get("financebench_id") in existing_scores
-    ]
+    scores = [existing_scores[r["financebench_id"]] for r in runs if r.get("financebench_id") in existing_scores]
     with scores_path.open("w", encoding="utf-8") as fh:
         for s in scores:
             fh.write(json.dumps(s, ensure_ascii=False) + "\n")

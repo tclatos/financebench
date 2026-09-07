@@ -6,12 +6,11 @@ import asyncio
 from typing import Annotated
 
 import typer
-from rich.console import Console
-from rich.table import Table
-
 from genai_tk.agents.harness import create_harness
 from genai_tk.agents.harness.registry import list_harness_profiles
 from genai_tk.cli.base import CliTopCommand
+from rich.console import Console
+from rich.table import Table
 
 console = Console()
 
@@ -44,12 +43,8 @@ class AgentCommands(CliTopCommand):
                 str | None,
                 typer.Argument(help="Query to send (omit for interactive mode)"),
             ] = None,
-            profile: Annotated[
-                str, typer.Option("-p", "--profile", help="Agent profile key")
-            ] = "default",
-            llm: Annotated[
-                str | None, typer.Option("-m", "--llm", help="LLM identifier override")
-            ] = None,
+            profile: Annotated[str, typer.Option("-p", "--profile", help="Agent profile key")] = "default",
+            llm: Annotated[str | None, typer.Option("-m", "--llm", help="LLM identifier override")] = None,
         ) -> None:
             """Chat with a configured agent profile via the unified harness layer.
 
@@ -63,9 +58,7 @@ class AgentCommands(CliTopCommand):
                 cli agent chat            # interactive multi-turn mode
             """
             try:
-                harness = create_harness(
-                    profile, llm_override=llm, force_memory_checkpointer=True
-                )
+                harness = create_harness(profile, llm_override=llm, force_memory_checkpointer=True)
             except ValueError as exc:
                 console.print(f"[red]Error:[/red] {exc}")
                 raise typer.Exit(1) from exc

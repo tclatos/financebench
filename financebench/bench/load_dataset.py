@@ -20,9 +20,9 @@ import sys
 from collections import Counter
 
 import pandas as pd
+import pathspec
 from datasets import load_dataset
 from loguru import logger
-import pathspec
 
 from financebench.bench._env import FB_DIR, ensure_dirs, load_env
 
@@ -119,9 +119,7 @@ def questions_for_doc(df: pd.DataFrame, doc_name: str) -> list[dict]:
                         "evidence_text": _clean(ev.get("evidence_text")),
                         "evidence_doc_name": _clean(ev.get("evidence_doc_name")),
                         "evidence_page_num": _clean(ev.get("evidence_page_num")),
-                        "evidence_text_full_page": _clean(
-                            ev.get("evidence_text_full_page")
-                        ),
+                        "evidence_text_full_page": _clean(ev.get("evidence_text_full_page")),
                     }
                     for ev in evidence
                 ],
@@ -155,20 +153,14 @@ def write_questions(df: pd.DataFrame, doc_names: str | list[str]) -> list[dict]:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     TARGET_PATH.write_text(",".join(names), encoding="utf-8")
-    logger.info(
-        "Wrote {} questions for {} doc(s) to {}", len(rows), len(names), QUESTIONS_PATH
-    )
+    logger.info("Wrote {} questions for {} doc(s) to {}", len(rows), len(names), QUESTIONS_PATH)
     return rows
 
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Load FinanceBench and select a target doc."
-    )
-    parser.add_argument(
-        "--doc", default=None, help="Override the auto-selected doc_name."
-    )
+    parser = argparse.ArgumentParser(description="Load FinanceBench and select a target doc.")
+    parser.add_argument("--doc", default=None, help="Override the auto-selected doc_name.")
     args = parser.parse_args(argv)
 
     df = load_financebench()

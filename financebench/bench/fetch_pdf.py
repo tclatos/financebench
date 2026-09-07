@@ -32,9 +32,7 @@ def resolve_doc_name(doc_name: str | None) -> str:
         return doc_name
     if TARGET_PATH.exists():
         return TARGET_PATH.read_text(encoding="utf-8").strip()
-    raise SystemExit(
-        "No --doc given and no target_doc.txt found; run load_dataset first."
-    )
+    raise SystemExit("No --doc given and no target_doc.txt found; run load_dataset first.")
 
 
 def fetch_pdf(doc_name: str, *, pdfs_dir: Path | None = None) -> str:
@@ -49,9 +47,7 @@ def fetch_pdf(doc_name: str, *, pdfs_dir: Path | None = None) -> str:
     base.mkdir(parents=True, exist_ok=True)
     pdf_path = base / f"{doc_name}.pdf"
     if pdf_path.exists() and pdf_path.stat().st_size > 0:
-        logger.info(
-            "PDF already present: {} ({} bytes)", pdf_path, pdf_path.stat().st_size
-        )
+        logger.info("PDF already present: {} ({} bytes)", pdf_path, pdf_path.stat().st_size)
         return str(pdf_path)
 
     url = f"{PDF_BASE_URL}/{doc_name}.pdf"
@@ -67,9 +63,7 @@ def fetch_pdf(doc_name: str, *, pdfs_dir: Path | None = None) -> str:
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Download a FinanceBench PDF.")
-    parser.add_argument(
-        "--doc", default=None, help="doc_name to download (default: selected target)."
-    )
+    parser.add_argument("--doc", default=None, help="doc_name to download (default: selected target).")
     args = parser.parse_args(argv)
 
     doc_name = resolve_doc_name(args.doc)
