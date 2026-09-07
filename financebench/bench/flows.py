@@ -481,6 +481,7 @@ def grade_flow(cfg: BenchConfig, runs: list[dict[str, Any]] | None = None) -> di
                     "correctness": "incorrect",
                     "numeric_match": None,
                     "groundedness": "ungrounded",
+                    "error_category": "halted_or_empty_response",
                     "rationale": f"Grading error: {exc}",
                 }
                 new_scores.append(fallback)

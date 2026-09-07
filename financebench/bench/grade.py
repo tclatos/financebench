@@ -37,6 +37,13 @@ from financebench.bench.run_questions import RUNS_PATH
 
 SCORES_PATH = FB_DIR / "scores.jsonl"
 
+ErrorCategory = Literal[
+    "missing_ocr_or_visual_chart",
+    "calculation_or_math_error",
+    "retrieval_or_lookup_error",
+    "halted_or_empty_response",
+]
+
 
 class JudgeVerdict(BaseModel):
     """Structured verdict returned by the LLM-as-judge."""
@@ -44,6 +51,7 @@ class JudgeVerdict(BaseModel):
     correctness: Literal["correct", "partial", "incorrect"]
     numeric_match: bool | None = None
     groundedness: Literal["grounded", "partial", "ungrounded"] = "partial"
+    error_category: ErrorCategory | None = None
     rationale: str = ""
 
 
@@ -57,6 +65,7 @@ Return ONLY a JSON object with exactly these keys:
   "correctness": "correct" | "partial" | "incorrect",
   "numeric_match": true | false | null,
   "groundedness": "grounded" | "partial" | "ungrounded",
+  "error_category": "missing_ocr_or_visual_chart" | "calculation_or_math_error" | "retrieval_or_lookup_error" | "halted_or_empty_response" | null,
   "rationale": "<one sentence>"
 }
 
@@ -84,6 +93,12 @@ Tiers:
   number was expected and it does not match; null if no specific number expected.
 - "groundedness" = whether the agent's answer is supported by the cited/source
   text rather than invented. "ungrounded" if it states facts not in the filing.
+- "error_category" = when correctness is "partial" or "incorrect", categorize the primary root cause:
+  * "missing_ocr_or_visual_chart": question requires reading a visual chart, line plot, graph, or diagram missing/unreadable in text OCR transcript.
+  * "calculation_or_math_error": agent found the relevant figures, but made an arithmetic, formula, or rounding calculation mistake.
+  * "retrieval_or_lookup_error": agent retrieved or referenced the wrong table, row, date, or failed to find the relevant section.
+  * "halted_or_empty_response": agent timed out, looped, hit tool recursion limits, or returned an empty/aborted response.
+  When correctness is "correct", error_category must be null.
 - Ignore any reasoning preamble in the agent's answer (e.g. "Now let me check
   ..."); grade only the substantive answer.
 """
@@ -208,6 +223,91 @@ def _parse_verdict(content: str) -> JudgeVerdict:
         ):
             correctness = "correct"
 
+    # Normalize error_category
+    error_category: ErrorCategory | None = None
+    if correctness in ("partial", "incorrect"):
+        raw_err = str(raw_dict.get("error_category") or "").lower().strip()
+        if raw_err in (
+            "missing_ocr_or_visual_chart",
+            "missing_ocr",
+            "visual_chart",
+            "visual",
+            "ocr",
+            "chart",
+            "graph",
+            "plot",
+        ):
+            error_category = "missing_ocr_or_visual_chart"
+        elif raw_err in (
+            "calculation_or_math_error",
+            "calculation",
+            "math",
+            "arithmetic",
+            "formula",
+            "calculation_error",
+            "math_error",
+        ):
+            error_category = "calculation_or_math_error"
+        elif raw_err in (
+            "retrieval_or_lookup_error",
+            "retrieval",
+            "lookup",
+            "search",
+            "retrieval_error",
+            "lookup_error",
+        ):
+            error_category = "retrieval_or_lookup_error"
+        elif raw_err in (
+            "halted_or_empty_response",
+            "halted",
+            "empty",
+            "aborted",
+            "timeout",
+            "halted_response",
+            "empty_response",
+        ):
+            error_category = "halted_or_empty_response"
+        elif any(k in raw_err for k in ("ocr", "chart", "visual", "plot", "graph")):
+            error_category = "missing_ocr_or_visual_chart"
+        elif any(k in raw_err for k in ("calc", "math", "arithmetic", "formula")):
+            error_category = "calculation_or_math_error"
+        elif any(k in raw_err for k in ("halt", "empty", "abort", "time")):
+            error_category = "halted_or_empty_response"
+        elif any(k in raw_err for k in ("retriev", "lookup", "search")):
+            error_category = "retrieval_or_lookup_error"
+        else:
+            # Fallback heuristic based on rationale or numeric match
+            rat_lower = rationale.lower()
+            if any(
+                k in rat_lower
+                for k in (
+                    "chart",
+                    "plot",
+                    "graph",
+                    "visual",
+                    "image",
+                    "not in the text",
+                    "not in text",
+                    "unreadable",
+                    "missing from the document",
+                    "local maxima",
+                )
+            ):
+                error_category = "missing_ocr_or_visual_chart"
+            elif any(
+                k in rat_lower
+                for k in ("calculation", "math", "arithmetic", "formula", "rounded", "computation", "computed")
+            ):
+                error_category = "calculation_or_math_error"
+            elif any(k in rat_lower for k in ("empty", "aborted", "halted", "timed out", "no answer", "circuit breaker")):
+                error_category = "halted_or_empty_response"
+            elif numeric_match is False:
+                error_category = "calculation_or_math_error"
+            else:
+                error_category = "retrieval_or_lookup_error"
+    else:
+        error_category = None
+
     if correctness == "correct" and groundedness == "ungrounded":
         groundedness = "grounded"
 
@@ -215,6 +315,7 @@ def _parse_verdict(content: str) -> JudgeVerdict:
         correctness=correctness,
         numeric_match=numeric_match,
         groundedness=groundedness,
+        error_category=error_category,
         rationale=rationale,
     )
 
@@ -269,6 +370,7 @@ async def _grade_one(
             "correctness": "incorrect",
             "numeric_match": None,
             "groundedness": "ungrounded",
+            "error_category": "halted_or_empty_response",
             "rationale": f"judge parse error: {exc}; raw={content[:200]}",
         }
 
@@ -308,9 +410,10 @@ async def _grade_all(
         with out_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(score, ensure_ascii=False) + "\n")
         logger.info(
-            "  → {} (numeric={}) [{}]",
+            "  → {} (numeric={}, err={}) [{}]",
             score["correctness"],
             score["numeric_match"],
+            score.get("error_category"),
             (score["rationale"][:90] + "…") if len(score["rationale"]) > 90 else score["rationale"],
         )
     return scores
@@ -327,6 +430,21 @@ def _summarize(scores: list[dict]) -> dict:
     grounded = sum(1 for s in scores if s.get("groundedness") == "grounded" or s.get("grounded") is True)
     numeric = [s for s in scores if s.get("numeric_match") is not None]
     numeric_ok = sum(1 for s in numeric if s.get("numeric_match") is True)
+
+    # OCR / Visual Chart Adjusted Metrics
+    ocr_errors = sum(1 for s in scores if s.get("error_category") == "missing_ocr_or_visual_chart")
+    adjusted_scores = [s for s in scores if s.get("error_category") != "missing_ocr_or_visual_chart"]
+    adj_n = len(adjusted_scores)
+    adj_correct = sum(1 for s in adjusted_scores if s.get("correctness") == "correct")
+    adj_partial = sum(1 for s in adjusted_scores if s.get("correctness") == "partial")
+
+    error_breakdown = {
+        "missing_ocr_or_visual_chart": ocr_errors,
+        "calculation_or_math_error": sum(1 for s in scores if s.get("error_category") == "calculation_or_math_error"),
+        "retrieval_or_lookup_error": sum(1 for s in scores if s.get("error_category") == "retrieval_or_lookup_error"),
+        "halted_or_empty_response": sum(1 for s in scores if s.get("error_category") == "halted_or_empty_response"),
+    }
+
     return {
         "n": n,
         "correct": correct,
@@ -338,6 +456,11 @@ def _summarize(scores: list[dict]) -> dict:
         "groundedness_rate": round(grounded / n, 3),
         "numeric_questions": len(numeric),
         "numeric_match_rate": round(numeric_ok / len(numeric), 3) if numeric else None,
+        "ocr_errors": ocr_errors,
+        "ocr_adjusted_n": adj_n,
+        "ocr_adjusted_accuracy_correct": round(adj_correct / adj_n, 3) if adj_n else None,
+        "ocr_adjusted_accuracy_correct_or_partial": round((adj_correct + adj_partial) / adj_n, 3) if adj_n else None,
+        "error_breakdown": error_breakdown,
         "avg_tool_calls": round(sum(s.get("n_tool_calls", 0) for s in scores) / n, 2),
         "avg_input_tokens": round(sum(s.get("input_tokens", 0) for s in scores) / n),
         "avg_output_tokens": round(sum(s.get("output_tokens", 0) for s in scores) / n),
@@ -370,6 +493,20 @@ def generate_markdown_report(
         f"{summary.get('numeric_match_rate', 0) * 100:.1f}%" if summary.get("numeric_match_rate") is not None else "N/A"
     )
 
+    adj_n = summary.get("ocr_adjusted_n", n)
+    adj_correct_val = summary.get("correct", 0)
+    adj_lenient_val = summary.get("correct", 0) + summary.get("partial", 0)
+    ocr_adj_exact = (
+        f"{summary.get('ocr_adjusted_accuracy_correct', 0) * 100:.1f}%"
+        if summary.get("ocr_adjusted_accuracy_correct") is not None
+        else "N/A"
+    )
+    ocr_adj_lenient = (
+        f"{summary.get('ocr_adjusted_accuracy_correct_or_partial', 0) * 100:.1f}%"
+        if summary.get("ocr_adjusted_accuracy_correct_or_partial") is not None
+        else "N/A"
+    )
+
     lines: list[str] = [
         f"# FinanceBench Benchmark Report: `{profile_name}`",
         "",
@@ -385,6 +522,8 @@ def generate_markdown_report(
         f"| **Exact Correct** | {summary.get('correct', 0)} ({acc_exact}) |",
         f"| **Correct or Partial** | {summary.get('correct', 0) + summary.get('partial', 0)} ({acc_lenient}) |",
         f"| **Incorrect** | {summary.get('incorrect', 0)} ({summary.get('incorrect', 0) / max(1, n) * 100:.1f}%) |",
+        f"| **OCR-Adjusted Exact Correct** | {adj_correct_val} / {adj_n} ({ocr_adj_exact}) |",
+        f"| **OCR-Adjusted Lenient** | {adj_lenient_val} / {adj_n} ({ocr_adj_lenient}) |",
         f"| **Groundedness Rate** | {summary.get('grounded', 0)} / {n} ({groundedness}) |",
         f"| **Numeric Match Rate** | {num_match} ({summary.get('numeric_questions', 0)} numeric questions) |",
         f"| **Avg Tool Calls / Question** | {summary.get('avg_tool_calls', 0)} |",
@@ -392,6 +531,24 @@ def generate_markdown_report(
         f"| **Avg Output Tokens / Question** | {summary.get('avg_output_tokens', 0):,} |",
         "",
     ]
+
+    # Error breakdown table
+    eb = summary.get("error_breakdown", {})
+    non_perfect_total = summary.get("partial", 0) + summary.get("incorrect", 0)
+    if non_perfect_total > 0:
+        lines.extend(
+            [
+                "## Error Category Breakdown",
+                "",
+                "| Error Category | Count | % of Non-Correct | Description |",
+                "|---|---|---|---|",
+                f"| `missing_ocr_or_visual_chart` | {eb.get('missing_ocr_or_visual_chart', 0)} | {eb.get('missing_ocr_or_visual_chart', 0) / max(1, non_perfect_total) * 100:.1f}% | Visual charts/plots or un-OCRed images in document |",
+                f"| `calculation_or_math_error` | {eb.get('calculation_or_math_error', 0)} | {eb.get('calculation_or_math_error', 0) / max(1, non_perfect_total) * 100:.1f}% | Arithmetic, formula, or statistical calculation discrepancy |",
+                f"| `retrieval_or_lookup_error` | {eb.get('retrieval_or_lookup_error', 0)} | {eb.get('retrieval_or_lookup_error', 0) / max(1, non_perfect_total) * 100:.1f}% | Wrong table/row/date or missing text retrieval |",
+                f"| `halted_or_empty_response` | {eb.get('halted_or_empty_response', 0)} | {eb.get('halted_or_empty_response', 0) / max(1, non_perfect_total) * 100:.1f}% | Aborted, timed out, or empty response |",
+                "",
+            ]
+        )
 
     # Breakdown by document
     by_doc: dict[str, list[dict]] = defaultdict(list)
@@ -458,6 +615,7 @@ def generate_markdown_report(
                     f"- **Question**: {s.get('question')}",
                     f"- **Gold Answer**: {s.get('gold_answer')}",
                     f"- **Agent Answer**: {s.get('agent_answer')}",
+                    f"- **Error Category**: `{s.get('error_category') or 'none'}`",
                     f"- **Judge Rationale**: {s.get('rationale')}",
                     f"- **Numeric Match**: {s.get('numeric_match')}",
                     f"- **Groundedness**: {s.get('groundedness')}",

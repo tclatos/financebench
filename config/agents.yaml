@@ -39,6 +39,10 @@ agents:
         then `get_section_content` on the matching sections.
       - Use `search_sections` with targeted terms to locate specific line items. Do not chain repeated blind
         searches — map the document with `get_document_toc` if two searches do not land on the answer.
+      - Never output intermediate status narrations without tool calls:
+        When additional information or calculations are required, ALWAYS emit the next tool call directly.
+        Do NOT output intermediate commentary without a tool call, as generating a message without tool calls
+        terminates the run. Only emit plain text when delivering the complete final answer.
 
       Answering rules:
       - Read the table before you compute. Extract exact numbers from row/column intersections, verify period

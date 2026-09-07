@@ -39,12 +39,17 @@ Use `get_document_toc` to inspect the outline, but keep these critical structura
 3. **Targeted Search with `search_sections(query="<query>")`**:
    - Run a hybrid search (vector + BM25) across the corpus when the exact section cannot be located via the TOC.
    - Use high-signal terms (e.g. `query="Consolidated Balance Sheets"`, `query="Segment Information Note"`, `query="Exhibit 99.1"`).
-4. **Read Raw Markdown with `get_section_content(section_ids="<id1>,<id2>")`**:
+4. **Read Raw Markdown with `get_section_content(section_ids="<id1>,<id2>", start_line=..., max_lines=...)`**:
    - Read the complete section markdown for selected sections to view all table rows, column headers, units, and footnote markers.
+   - For wide or tall tables (spanning 50+ lines), use `start_line` and `max_lines` (e.g. `get_section_content(section_ids="<id>", start_line=1, max_lines=40)`) to paginate or focus on target rows/columns without overflowing context.
 5. **Map Before You Re-Search**:
    - Do not chain blind searches. If two searches fail to land on the answer, call `get_document_toc` on the document to view the section tree and read the relevant section directly.
 6. **Do NOT Re-Fetch Document TOC**:
    - Once you call `get_document_toc` for a document, its full section tree and all section IDs remain available in your conversation history above. Do NOT call `get_document_toc` multiple times for the same document — refer to the earlier output to select your next sections.
+7. **Multi-Step Continuity & Tool Calling Discipline**:
+   - When multi-period, multi-table, or multi-filing questions require successive lookups, **ALWAYS invoke the next tool call directly in each turn**.
+   - Do NOT output conversational status updates (e.g., *"Now let me check the 2023 10-K..."*) without invoking the tool call, because generating text without tool calls terminates the execution loop.
+   - Only emit plain text when delivering the comprehensive final answer.
 
 ---
 
