@@ -10,7 +10,8 @@ paths:
   pdfs_dir: ${paths.data_root}/pdfs
   markdown_dir: ${paths.data_root}/markdown_multi
   kg_db: ${paths.data_root}/kg/financebench_multi.db
-  onedrive_markdown_dir: ~/OneDrive/prj/financebench/markdown
+  saved_markdown_dir: ~/OneDrive/prj/financebench/markdown
+  onedrive_markdown_dir: ${paths.saved_markdown_dir}
   runs: ${paths.data_root}/financebench/{profile}/runs.jsonl
   scores: ${paths.data_root}/financebench/{profile}/scores.jsonl
   scores_summary: ${paths.data_root}/financebench/{profile}/scores_summary.json
