@@ -5,4 +5,3 @@ from __future__ import annotations
 from genai_graph.core.commands_bench import BenchCommands
 
 __all__ = ["BenchCommands"]
-
