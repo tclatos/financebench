@@ -76,10 +76,10 @@ def create_my_tools() -> list[BaseTool]:
     return [MyTool()]
 ```
 
-Reference factory in an agent profile (`config/agents.yaml`):
+Reference tool in an agent profile (`config/agents.yaml`):
 ```yaml
 tools:
-  - factory: financebench.tools.my_tool.create_my_tools
+  - financebench.tools.my_tool.create_my_tools
 ```
 
 ## LCEL Chains
@@ -141,7 +141,7 @@ agents:
     llm: default
     system_prompt: "You are a helpful assistant."
     tools:
-      - factory: financebench.tools.example_tool.create_example_tools
+      - financebench.tools.example_tool.create_example_tools
     mcp_servers: []
     skill_directories:
       - ${paths.project}/skills/custom
