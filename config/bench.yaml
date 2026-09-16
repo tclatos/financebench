@@ -1,92 +1,37 @@
-# FinanceBench evaluation configurations and document conversion settings.
+# FinanceBench evaluation configuration.
 # Select active profile via CLI `--profile <name>` (defaults to `default_profile`).
 # Outcome paths write under a dedicated directory per bench profile.
 
-default_profile: mistral_glm
-adapter: financebench.adapter.FinanceBenchAdapter
+default_profile: default
+dataset_adapter: financebench.adapter.FinanceBenchAdapter
 
-# Shared paths across all bench profiles using OmegaConf variable interpolation.
-# Can be overridden per profile if needed.
+# Shared outcome paths across all bench profiles
 paths:
-  pdfs_dir: ${paths.data_root}/pdfs
-  markdown_dir: ${paths.data_root}/markdown_multi
-  kg_db: ${paths.data_root}/kg/financebench_multi.db
-  saved_markdown_dir: ~/OneDrive/prj/financebench/markdown
-  onedrive_markdown_dir: ${paths.saved_markdown_dir}
   runs: ${paths.data_root}/financebench/{profile}/runs.jsonl
   scores: ${paths.data_root}/financebench/{profile}/scores.jsonl
   scores_summary: ${paths.data_root}/financebench/{profile}/scores_summary.json
 
-graph_db:   
-  default: ${paths.kg_db}   # used by 'cli docgraph' commands
-
-
 bench_profiles:
-  mistral_glm:
-    description: "GLM 5.2 agent with Mistral OCR and DeepSeek V4 Pro judge"
-    markdownize_profile: best
-
-    # Trace monitoring method: null (None / disabled) | "langchain" (LangSmith) | "langfuse" | "local" | "otel"
-    monitoring: null
-
-    llms:
-      agent: glm_5.2@openrouter
-      build: deepseek-v4-flash-0731@openrouter
-      judge: DeepSeek-V4-Pro-0813@openrouter
-
-    build:
-      skip_ocr: false
-      force: false
-      llm: deepseek-v4-flash-0731@openrouter  # LLM used for structure and summaries (or false for pure algorithmic)
-      structure_strategy: auto                # auto | algo | toc_preamble | llm_full
-      summaries: true                         # generate LLM section descriptions & summaries (for get_document_toc)
-      workers: 4
-      summary_min_tokens: 800
-      context_safety_ratio: 0.9
-      embeddings: qwen3_06b@deepinfra         # SectionChunk vector model (null = no vector leg, keyword-only search)
-      fts: true                               # native BM25/FTS index over MarkdownSection(title, text, description)
-      chunk_size_tokens: 1500                 # target chunk size for long sections
+  default:
+    description: "FinanceBench QA agent with DeepSeek V4 Pro grader on SEC filings corpus"
+    docgraph_profile: default
+    agent_profile: default
 
     files:
       pathspecs:
         - "*"
+      docs: []
       limit: null
 
-    agent:
-      profile: default
-      folder_id: null         # null = whole corpus (agent must pick the right doc)
-      concurrency: 10         # max concurrent question executions
+    runner:
+      concurrency: 10
+      folder_id: null
+      monitoring: null
 
-    judge:
+    grader:
       enabled: true
-      concurrency: 5          # max concurrent LLM-as-judge grading tasks
+      llm: DeepSeek-V4-Pro-0813@openrouter
+      concurrency: 5
 
-
-# Document converter definitions and pathspec-driven profiles
-markdownize_profiles:
-  fast:
-    rules:
-      - pathspec: "**/*.{xlsx,xls,ods}"
-        converter: messy_xls
-      - pathspec: "**/*"
-        converter: anydoc
-
-  best:
-    rules:
-      - pathspec: "**/*.{xlsx,xls,ods}"
-        converter: messy_xls
-      - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf}"
-        converter: mistral_ocr
-      - pathspec: "**/*"
-        converter: anydoc
-
-  medium:
-    rules:
-      - pathspec: "**/*.{ppt,pptx,odp,doc,docx,odt,rtf,xlsx,xls,ods}"
-        converter: via_pdf
-      - pathspec: "**/*.pdf"
-        converter: lighton_ocr
-      - pathspec: "**/*"
-        converter: anydoc
 
 
